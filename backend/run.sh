@@ -1,0 +1,1 @@
+fastapi dev main.py --port 5200 --reload

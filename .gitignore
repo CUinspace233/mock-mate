@@ -1,0 +1,4 @@
+.specstory
+.vscode
+.mypy_cache/
+.env

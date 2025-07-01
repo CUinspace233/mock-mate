@@ -21,13 +21,15 @@ source .venv/bin/activate # might be different on your system, but uv will tell 
 uv sync
 ```
 
-Note: You can change the values in the `.env` file to your own.
+Note: You should change the values in the `.env` file to your own.
 
 #### Run
 
 ```bash
 ./run.sh # The port is 5200 by default, you can change it in the script
 ```
+Note: After the application startup complete, it will begin running a task of fetching news for a while.
+During the fetching (around 1 min) api requests might be slow.
 
 #### API Documentation
 
@@ -41,7 +43,7 @@ cp .env.example .env
 npm i
 ```
 
-Note: You should change the values in the `.env` file to your own.
+Note: You can change the values in the `.env` file to your own.
 
 #### Run
 

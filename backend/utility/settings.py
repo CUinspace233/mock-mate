@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     api_url: str = "http://localhost:5200"
 
     openai_api_key: str = ""
+    news_fetch_user_agent: str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
 
     branch: str | None = None
     commit_id: str | None = None

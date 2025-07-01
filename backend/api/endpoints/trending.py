@@ -20,6 +20,7 @@ from database.schemas import (
     GeneratedQuestion,
 )
 import requests  # type: ignore
+from utility.settings import settings
 
 router = APIRouter()
 client = OpenAI()
@@ -68,8 +69,7 @@ async def fetch_rss_news(url: str, limit: int = 10) -> list[dict]:
     try:
         logger.info(f"🔍 Fetching RSS from: {url}")
         headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+            "User-Agent": settings.news_fetch_user_agent
         }
         resp = requests.get(url, headers=headers, timeout=10)
         feed = feedparser.parse(resp.content)

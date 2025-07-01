@@ -27,15 +27,18 @@ source .venv/bin/activate # might be different on your system, but uv will tell 
 uv sync
 ```
 
-Note: You should change the values in the `.env` file to your own.
+Note: You should change the `OPENAI_API_KEY` in the `.env` file to your own.
+
+For `NEWS_FETCH_USER_AGENT` in `.env`, you might not need to change it, but if the news fetching is not working, you can try to change it to your own browser's user agent. (Simply google "my browser user agent")
 
 #### Run in development mode
 
 ```bash
 ./run.sh # The port is 5200 by default, you can change it in the script
 ```
-Note: After the application startup complete, it will begin running a task of fetching news for a while.
-During the fetching (around 1 min) api requests might be slow.
+Note: After the application startup complete, it will start running a task of fetching news for a while.
+
+During the fetching (around 1 min), api requests might be slow.
 
 #### API Documentation
 

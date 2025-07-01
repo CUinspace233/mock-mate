@@ -2,6 +2,10 @@
 
 ![mock-mate icon](./mock-mate-icon.png)
 
+## Introduction
+
+**Mock Mate** is a comprehensive **interview practice** platform that simulates real-world technical interviews. The system combines AI-powered question generation, automated answer evaluation, and trending news-based interview questions to provide an up-to-date and realistic interview experience.
+
 ## Setup
 
 ### Prerequisites
@@ -23,7 +27,7 @@ uv sync
 
 Note: You should change the values in the `.env` file to your own.
 
-#### Run
+#### Run in development mode
 
 ```bash
 ./run.sh # The port is 5200 by default, you can change it in the script
@@ -45,7 +49,9 @@ npm i
 
 Note: You can change the values in the `.env` file to your own.
 
-#### Run
+#### Run in development mode
+
+The port is `1314` by default, you can change it in `vite.config.ts`
 
 ```bash
 npm run dev

@@ -21,7 +21,7 @@ source .venv/bin/activate # might be different on your system, but uv will tell 
 uv sync
 ```
 
-Note: You can change the values in the `.env` file to your own.
+Note: You should change the values in the `.env` file to your own.
 
 #### Run
 

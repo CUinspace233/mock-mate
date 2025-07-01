@@ -17,17 +17,21 @@
 cd backend
 cp .env.example .env
 uv venv
+source .venv/bin/activate # might be different on your system, but uv will tell you the correct command
 uv sync
 ```
 
-Note: Change the values in the `.env` file to your own.
+Note: You can change the values in the `.env` file to your own.
 
 #### Run
 
 ```bash
-./run.sh
+./run.sh # The port is 5200 by default, you can change it in the script
 ```
 
+#### API Documentation
+
+Visit [http://localhost:5200/docs](http://localhost:5200/docs) to view the API documentation.
 
 ### Frontend
 
@@ -37,10 +41,14 @@ cp .env.example .env
 npm i
 ```
 
-Note: Change the values in the `.env` file to your own.
+Note: You should change the values in the `.env` file to your own.
 
 #### Run
 
 ```bash
 npm run dev
 ```
+
+## System Architecture (Task Design Document)
+
+See [SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md)

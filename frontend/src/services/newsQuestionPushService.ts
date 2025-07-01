@@ -32,17 +32,20 @@ export class NewsQuestionPushService {
       // Request notification permission
       await this.requestNotificationPermission();
 
-      // Get user preferences
-      const preferences = await getUserPreferences(this.userId);
-
       // Start immediate push if no recent pushes
+      const initialPreferences = await getUserPreferences(this.userId);
       if (this.shouldPushImmediate()) {
-        await this.pushNewsQuestion(preferences);
+        await this.pushNewsQuestion(initialPreferences);
       }
 
       // Set up periodic pushing
-      this.pushTimer = setInterval(() => {
-        this.pushNewsQuestion(preferences);
+      this.pushTimer = setInterval(async () => {
+        try {
+          const preferences = await getUserPreferences(this.userId);
+          await this.pushNewsQuestion(preferences);
+        } catch (error) {
+          console.error("Failed to fetch preferences or push news question:", error);
+        }
       }, NewsQuestionPushService.PUSH_INTERVAL);
 
       console.log("News question push service started");
@@ -149,7 +152,7 @@ export class NewsQuestionPushService {
     return Boolean(sessionId);
   }
 
-  // Check if should push immediately (first time or 5+ hours since last push)
+  // Check if should push immediately (first time or 24 hours since last push)
   private shouldPushImmediate(): boolean {
     const lastPushTime = useNewsQuestionPushStore.getState().getLastPushTime(this.userId);
     if (!lastPushTime) return true;

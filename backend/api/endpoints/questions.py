@@ -13,6 +13,7 @@ from database.schemas import (
     QuestionCategoriesResponse,
     QuestionOut,
     TopicCount,
+    QuestionType,
 )
 
 
@@ -22,12 +23,11 @@ client = OpenAI()
 
 
 async def generate_ai_question(
-    position: str, difficulty: str, topic: str | None = None
+    position: str, difficulty: str, question_type: QuestionType | None = QuestionType.TECHNICAL
 ) -> GeneratedQuestion:
     """Generate a question using AI (OpenAI GPT)"""
     prompt = (
-        f"Generate a {difficulty} level interview question for a {position} position"
-        + (f" about {topic}." if topic else " about any topic.")
+        f"Generate a {difficulty} level {question_type} interview question for a {position} position"
         + " Return only the question."
     )
 
@@ -47,9 +47,9 @@ async def generate_ai_question(
 
     return GeneratedQuestion(
         content=question_content,
+        question_type=question_type or QuestionType.TECHNICAL,
         position=position,
         difficulty=difficulty,
-        topic=topic or "general",
         expected_keywords=[
             "technical",
             "explanation",
@@ -67,14 +67,14 @@ async def generate_question(
         question_data = await generate_ai_question(
             request.position.value,
             request.difficulty.value if request.difficulty else "medium",
-            request.topic,
+            request.question_type,
         )
 
         question = models.Question(
             content=question_data.content,
             position=question_data.position,
             difficulty=question_data.difficulty,
-            topic=question_data.topic,
+            question_type=question_data.question_type,
             expected_keywords=question_data.expected_keywords,
         )
 
@@ -87,7 +87,7 @@ async def generate_question(
             content=question.content or "",
             position=question.position or "",
             difficulty=question.difficulty or "",
-            topic=question.topic or "",
+            question_type=request.question_type or QuestionType.TECHNICAL,
             expected_keywords=question.expected_keywords or [],
             created_at=question.created_at or datetime.now(UTC),
         )
@@ -116,25 +116,26 @@ async def get_question_categories(db: AsyncSession = Depends(get_db)):
             for pos in positions_data
         ]
 
-        # Get topics with counts
-        topics_query = (
+        # Get question types with counts
+        question_types_query = (
             select(
                 models.Question.position,
-                models.Question.topic,
+                models.Question.question_type,
                 func.count(models.Question.id).label("count"),
             )
-            .where(models.Question.topic.isnot(None))
-            .group_by(models.Question.position, models.Question.topic)
+            .where(models.Question.question_type.isnot(None))
+            .group_by(models.Question.position, models.Question.question_type)
         )
 
-        topics_result = await db.execute(topics_query)
-        topics_data = topics_result.fetchall()
+        question_types_result = await db.execute(question_types_query)
+        question_types_data = question_types_result.fetchall()
 
-        topics = [
-            TopicCount(position=topic[0], topic=topic[1], count=topic[2]) for topic in topics_data
+        question_types = [
+            TopicCount(position=qt[0], question_type=qt[1], count=qt[2])
+            for qt in question_types_data
         ]
 
-        return QuestionCategoriesResponse(positions=positions, topics=topics)
+        return QuestionCategoriesResponse(positions=positions, question_types=question_types)
 
     except Exception as e:
         raise HTTPException(

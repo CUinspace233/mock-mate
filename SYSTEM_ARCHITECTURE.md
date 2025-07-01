@@ -103,7 +103,7 @@ Mock Mate is a comprehensive interview practice platform that simulates real-wor
 ### Frontend (React + TypeScript + Joy UI)
 
 #### Architecture
-- **React 18** with TypeScript for type safety
+- **React 19** with TypeScript for type safety
 - **Vite** for build tooling and development
 - **Zustand** for client-side state management and persistence
 - **Joy UI** for UI components

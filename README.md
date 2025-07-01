@@ -28,6 +28,7 @@ Note: You should change the values in the `.env` file to your own.
 ```bash
 ./run.sh # The port is 5200 by default, you can change it in the script
 ```
+Note: After the application startup complete, it will begin running a task of fetching news for a while
 
 #### API Documentation
 

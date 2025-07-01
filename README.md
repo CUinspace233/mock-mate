@@ -42,7 +42,7 @@ cp .env.example .env
 npm i
 ```
 
-Note: You should change the values in the `.env` file to your own.
+Note: You can change the values in the `.env` file to your own.
 
 #### Run
 

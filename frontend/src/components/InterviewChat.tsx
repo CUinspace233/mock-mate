@@ -32,8 +32,11 @@ import {
   type PositionKey,
   Difficulty,
   type Message,
+  type NewsQuestion,
+  QuestionType,
 } from "../types/interview";
 import CustomAlert from "./CustomAlert";
+import { formatRelativeTime } from "../utils";
 
 interface InterviewChatProps {
   selectedPosition: string;
@@ -49,6 +52,9 @@ interface InterviewChatProps {
   setCurrentQuestion: React.Dispatch<React.SetStateAction<Message | null>>;
   awaitingAnswer: boolean;
   setAwaitingAnswer: React.Dispatch<React.SetStateAction<boolean>>;
+  presetQuestion?: NewsQuestion | null;
+  onPresetQuestionUsed?: () => void;
+  questionType: QuestionType;
 }
 
 export default function InterviewChat({
@@ -65,11 +71,15 @@ export default function InterviewChat({
   setCurrentQuestion,
   awaitingAnswer,
   setAwaitingAnswer,
+  presetQuestion,
+  onPresetQuestionUsed,
+  questionType,
 }: InterviewChatProps) {
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showAlert, setShowAlert] = useState(true);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -79,6 +89,14 @@ export default function InterviewChat({
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    if (awaitingAnswer && currentQuestion) {
+      setShowAlert(true);
+      const timer = setTimeout(() => setShowAlert(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [awaitingAnswer, currentQuestion]);
+
   const generateQuestion = useCallback(async () => {
     setIsLoading(true);
     setError("");
@@ -87,7 +105,7 @@ export default function InterviewChat({
       const req: GenerateQuestionRequest = {
         position: selectedPosition as PositionKey,
         difficulty: selectedDifficulty,
-        topic: null,
+        question_type: questionType,
         user_id: user_id,
       };
 
@@ -119,13 +137,49 @@ export default function InterviewChat({
     setMessages,
     setCurrentQuestion,
     setAwaitingAnswer,
+    questionType,
   ]);
+
+  const processPresetQuestion = useCallback(
+    (newsQuestion: NewsQuestion) => {
+      const newsInfoMessage: Message = {
+        id: `news-info-${newsQuestion.id}`,
+        sender: "ai",
+        content: `Interview Question based on the latest news\n\nSource: ${
+          newsQuestion.source_title
+        }\nPublished Time: ${formatRelativeTime(newsQuestion.published_at)}\nRelevance: ${(
+          newsQuestion.relevance_score * 100
+        ).toFixed(0)}%\n\n---\n\n`,
+        timestamp: new Date(),
+      };
+
+      const questionMessage: Message = {
+        id: newsQuestion.id,
+        sender: "ai",
+        content: newsQuestion.content,
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, newsInfoMessage, questionMessage]);
+      setCurrentQuestion(questionMessage);
+      setAwaitingAnswer(true);
+
+      if (onPresetQuestionUsed) {
+        onPresetQuestionUsed();
+      }
+    },
+    [setMessages, setCurrentQuestion, setAwaitingAnswer, onPresetQuestionUsed],
+  );
 
   useEffect(() => {
     if (interviewStarted && messages.length === 0) {
-      generateQuestion();
+      if (presetQuestion) {
+        processPresetQuestion(presetQuestion);
+      } else {
+        generateQuestion();
+      }
     }
-  }, [interviewStarted, messages.length, generateQuestion]);
+  }, [interviewStarted, messages.length, presetQuestion, processPresetQuestion, generateQuestion]);
 
   const handleSendAnswer = async () => {
     if (!currentAnswer.trim() || !currentQuestion) return;
@@ -174,7 +228,7 @@ export default function InterviewChat({
         answer: currentAnswer,
         score: evaluationMessage.score || 0,
         feedback: evaluationContent,
-        position: selectedPosition as PositionKey,
+        position: (presetQuestion?.position as PositionKey) || (selectedPosition as PositionKey),
         session_id: sessionId || null,
         question_id: currentQuestion.id,
         user_id: user_id,
@@ -238,8 +292,9 @@ export default function InterviewChat({
           Ready to Start Interview Practice
         </Typography>
         <Typography level="body-lg" color="neutral" sx={{ mb: 3 }}>
-          After selecting your target position, click 'Start Interview Practice' to receive
-          AI-generated interview questions.
+          After selecting your target position and difficulty,
+          <br />
+          click 'Get Interview Questions' to receive AI-generated interview questions.
         </Typography>
         <Button size="lg" startDecorator={<RobotIcon />} onClick={handleStartNewQuestion}>
           Get Interview Questions
@@ -364,19 +419,21 @@ export default function InterviewChat({
       <Box sx={{ p: 2 }}>
         {awaitingAnswer && currentQuestion ? (
           <Stack spacing={2}>
-            <Alert color="primary" variant="soft">
-              Please answer the question above, then click the send button to submit your answer.
-            </Alert>
+            {showAlert && (
+              <Alert color="primary" variant="soft">
+                Please answer the question above, then click the send button to submit your answer.
+              </Alert>
+            )}
             <Stack direction="row" spacing={2}>
               <Textarea
                 placeholder="Enter your answer here..."
                 value={currentAnswer}
                 onChange={(e) => setCurrentAnswer(e.target.value)}
                 minRows={3}
-                maxRows={6}
+                maxRows={10}
                 sx={{ flex: 1 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && e.ctrlKey) {
+                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                     handleSendAnswer();
                   }
                 }}
@@ -391,7 +448,7 @@ export default function InterviewChat({
                   Send Answer
                 </Button>
                 <Typography level="body-xs" color="neutral">
-                  Ctrl+Enter to send quickly
+                  Ctrl/Cmd+Enter to send
                 </Typography>
               </Stack>
             </Stack>

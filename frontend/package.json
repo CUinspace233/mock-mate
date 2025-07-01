@@ -15,10 +15,12 @@
     "@mui/icons-material": "^7.1.2",
     "@mui/joy": "^5.0.0-beta.52",
     "@mui/material": "^7.1.2",
+    "@mui/x-charts": "^8.6.0",
     "axios": "^1.10.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.6.3"
+    "react-router-dom": "^7.6.3",
+    "zustand": "^5.0.6"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",

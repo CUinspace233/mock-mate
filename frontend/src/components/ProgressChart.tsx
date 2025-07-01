@@ -1,175 +1,90 @@
-import { useState, useEffect } from "react";
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  Select,
-  Option,
-  Stack,
-  Chip,
-  LinearProgress,
-  Alert,
-} from "@mui/joy";
+import { useState, useEffect, useCallback } from "react";
+import { Box, Typography, Card, CardContent, Select, Option, Stack, Chip, Alert } from "@mui/joy";
 import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
   Remove as RemoveIcon,
 } from "@mui/icons-material";
 import { PositionLabels, type PositionKey } from "../types/interview";
-
-interface InterviewRecord {
-  id: string;
-  position: string;
-  question: string;
-  answer: string;
-  score: number;
-  feedback: string;
-  timestamp: string;
-}
+import { getUserProgress } from "../api/api";
+import type { ProgressData, ProgressStatistics, PositionBreakdown } from "../types/interview";
+import { BarChart } from "@mui/x-charts/BarChart";
 
 interface ProgressChartProps {
-  username: string;
+  userId: number;
   selectedPosition: string;
 }
 
-interface ProgressData {
-  date: string;
-  score: number;
-  count: number;
-}
-
-export default function ProgressChart({ username, selectedPosition }: ProgressChartProps) {
-  const [records, setRecords] = useState<InterviewRecord[]>([]);
-  const [timeRange, setTimeRange] = useState<string>("7days");
+export default function ProgressChart({ userId, selectedPosition }: ProgressChartProps) {
   const [progressData, setProgressData] = useState<ProgressData[]>([]);
+  const [statistics, setStatistics] = useState<ProgressStatistics | null>(null);
+  const [positionBreakdown, setPositionBreakdown] = useState<PositionBreakdown[]>([]);
+  const [timeRange, setTimeRange] = useState<"7days" | "30days" | "90days">("7days");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadRecords();
-  }, [username]);
+  const loadProgressData = useCallback(async () => {
+    if (userId === 0) return;
 
-  useEffect(() => {
-    generateProgressData();
-  }, [records, timeRange, selectedPosition]);
+    setLoading(true);
+    setError(null);
 
-  const loadRecords = () => {
-    const savedRecords = JSON.parse(localStorage.getItem(`${username}_interviewRecords`) || "[]");
-    setRecords(savedRecords);
-  };
-
-  const generateProgressData = () => {
-    const filteredRecords = records.filter((record) => record.position === selectedPosition);
-
-    const days = timeRange === "7days" ? 7 : timeRange === "30days" ? 30 : 90;
-    const data: ProgressData[] = [];
-
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateString = date.toLocaleDateString();
-
-      const dayRecords = filteredRecords.filter((record) => {
-        const recordDate = new Date(record.timestamp).toLocaleDateString();
-        return recordDate === dateString;
+    try {
+      const response = await getUserProgress(userId, {
+        position: selectedPosition,
+        time_range: timeRange,
       });
 
-      const averageScore =
-        dayRecords.length > 0
-          ? dayRecords.reduce((sum, record) => sum + record.score, 0) / dayRecords.length
-          : 0;
-
-      data.push({
-        date: dateString,
-        score: Math.round(averageScore),
-        count: dayRecords.length,
-      });
+      setProgressData(response.progress_data);
+      setStatistics(response.statistics);
+      setPositionBreakdown(response.position_breakdown);
+    } catch (err) {
+      console.error("Failed to load progress data:", err);
+      setError("Failed to load progress data. Please try again.");
+      // Reset to empty states on error
+      setProgressData([]);
+      setStatistics(null);
+      setPositionBreakdown([]);
+    } finally {
+      setLoading(false);
     }
+  }, [userId, selectedPosition, timeRange]);
 
-    setProgressData(data);
+  useEffect(() => {
+    loadProgressData();
+  }, [loadProgressData]);
+
+  // Format chart data for display
+  const chartData = progressData.map((item) => ({
+    date: new Date(item.date).toLocaleDateString(),
+    score: item.score,
+    question_count: item.question_count,
+  }));
+
+  const getImprovementIcon = (rate: number) => {
+    if (rate > 0) return <TrendingUpIcon />;
+    if (rate < 0) return <TrendingDownIcon />;
+    return <RemoveIcon />;
   };
 
-  const calculateOverallStats = () => {
-    const filteredRecords = records.filter((record) => record.position === selectedPosition);
-
-    if (filteredRecords.length === 0) {
-      return {
-        totalQuestions: 0,
-        averageScore: 0,
-        improvement: 0,
-        bestScore: 0,
-        worstScore: 0,
-        streak: 0,
-      };
-    }
-
-    const totalQuestions = filteredRecords.length;
-    const averageScore = Math.round(
-      filteredRecords.reduce((sum, record) => sum + record.score, 0) / totalQuestions,
-    );
-
-    const scores = filteredRecords.map((record) => record.score);
-    const bestScore = Math.max(...scores);
-    const worstScore = Math.min(...scores);
-
-    // Calculate improvement (comparing first half to second half)
-    const halfPoint = Math.floor(totalQuestions / 2);
-    const firstHalf = filteredRecords.slice(halfPoint);
-    const secondHalf = filteredRecords.slice(0, halfPoint);
-
-    const firstHalfAvg =
-      firstHalf.length > 0
-        ? firstHalf.reduce((sum, record) => sum + record.score, 0) / firstHalf.length
-        : 0;
-    const secondHalfAvg =
-      secondHalf.length > 0
-        ? secondHalf.reduce((sum, record) => sum + record.score, 0) / secondHalf.length
-        : 0;
-
-    const improvement = Math.round(secondHalfAvg - firstHalfAvg);
-
-    // Calculate streak (consecutive days with practice)
-    let streak = 0;
-    const today = new Date().toLocaleDateString();
-    const currentDate = new Date();
-
-    while (true) {
-      const dateString = currentDate.toLocaleDateString();
-      const hasRecord = filteredRecords.some(
-        (record) => new Date(record.timestamp).toLocaleDateString() === dateString,
-      );
-
-      if (hasRecord || dateString === today) {
-        if (hasRecord) streak++;
-        currentDate.setDate(currentDate.getDate() - 1);
-      } else {
-        break;
-      }
-    }
-
-    return {
-      totalQuestions,
-      averageScore,
-      improvement,
-      bestScore,
-      worstScore,
-      streak,
-    };
+  const getImprovementColor = (rate: number): "success" | "danger" | "neutral" => {
+    if (rate > 0) return "success";
+    if (rate < 0) return "danger";
+    return "neutral";
   };
-
-  const stats = calculateOverallStats();
-  const maxScore = Math.max(...progressData.map((d) => d.score), 100);
 
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Typography level="h4">
-          {PositionLabels[selectedPosition as PositionKey]} - Progress Trend
+          {PositionLabels[selectedPosition as PositionKey]} - Progress Analytics
         </Typography>
         <Select
           value={timeRange}
           onChange={(_, value) => setTimeRange(value || "7days")}
           sx={{ minWidth: 120 }}
+          disabled={loading}
         >
           <Option value="7days">Last 7 Days</Option>
           <Option value="30days">Last 30 Days</Option>
@@ -177,11 +92,29 @@ export default function ProgressChart({ username, selectedPosition }: ProgressCh
         </Select>
       </Stack>
 
-      {records.filter((r) => r.position === selectedPosition).length === 0 ? (
+      {/* Loading State */}
+      {loading && (
+        <Alert color="neutral" variant="soft">
+          Loading progress data...
+        </Alert>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <Alert color="danger" variant="soft">
+          {error}
+        </Alert>
+      )}
+
+      {/* No Data State */}
+      {!loading && !error && statistics?.total_questions === 0 && (
         <Alert color="neutral" variant="soft">
           No practice records for this position yet. Start practicing to track your progress!
         </Alert>
-      ) : (
+      )}
+
+      {/* Main Content */}
+      {!loading && !error && statistics && statistics.total_questions > 0 && (
         <>
           {/* Statistics Cards */}
           <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
@@ -190,7 +123,7 @@ export default function ProgressChart({ username, selectedPosition }: ProgressCh
                 <Typography level="body-sm" color="primary">
                   Total Questions
                 </Typography>
-                <Typography level="h3">{stats.totalQuestions}</Typography>
+                <Typography level="h3">{statistics.total_questions}</Typography>
               </CardContent>
             </Card>
 
@@ -199,29 +132,23 @@ export default function ProgressChart({ username, selectedPosition }: ProgressCh
                 <Typography level="body-sm" color="success">
                   Average Score
                 </Typography>
-                <Typography level="h3">{stats.averageScore}</Typography>
+                <Typography level="h3">{Math.round(statistics.average_score)}</Typography>
               </CardContent>
             </Card>
 
             <Card
               variant="soft"
-              color={stats.improvement >= 0 ? "success" : "danger"}
+              color={getImprovementColor(statistics.improvement_rate)}
               sx={{ flex: 1 }}
             >
               <CardContent>
                 <Stack direction="row" alignItems="center" spacing={1}>
                   <Typography level="body-sm">Improvement</Typography>
-                  {stats.improvement > 0 ? (
-                    <TrendingUpIcon />
-                  ) : stats.improvement < 0 ? (
-                    <TrendingDownIcon />
-                  ) : (
-                    <RemoveIcon />
-                  )}
+                  {getImprovementIcon(statistics.improvement_rate)}
                 </Stack>
                 <Typography level="h3">
-                  {stats.improvement > 0 ? "+" : ""}
-                  {stats.improvement}
+                  {statistics.improvement_rate > 0 ? "+" : ""}
+                  {statistics.improvement_rate.toFixed(1)}%
                 </Typography>
               </CardContent>
             </Card>
@@ -229,47 +156,87 @@ export default function ProgressChart({ username, selectedPosition }: ProgressCh
             <Card variant="soft" color="warning" sx={{ flex: 1 }}>
               <CardContent>
                 <Typography level="body-sm" color="warning">
-                  Streak
+                  Current Streak
                 </Typography>
-                <Typography level="h3">{stats.streak} Days</Typography>
+                <Typography level="h3">{statistics.current_streak} Days</Typography>
               </CardContent>
             </Card>
           </Stack>
 
-          {/* Score Range */}
-          <Card variant="outlined" sx={{ mb: 4 }}>
-            <CardContent>
-              <Typography level="title-md" sx={{ mb: 2 }}>
-                Score Range
-              </Typography>
-              <Stack direction="row" spacing={3}>
-                <Box>
-                  <Typography level="body-sm" color="success">
-                    Highest Score
-                  </Typography>
-                  <Chip color="success" size="lg">
-                    {stats.bestScore}
-                  </Chip>
-                </Box>
-                <Box>
-                  <Typography level="body-sm" color="danger">
-                    Lowest Score
-                  </Typography>
-                  <Chip color="danger" size="lg">
-                    {stats.worstScore}
-                  </Chip>
-                </Box>
-                <Box>
-                  <Typography level="body-sm" color="primary">
-                    Score Gap
-                  </Typography>
-                  <Chip color="primary" size="lg">
-                    {stats.bestScore - stats.worstScore}
-                  </Chip>
-                </Box>
-              </Stack>
-            </CardContent>
-          </Card>
+          {/* Additional Statistics Row */}
+          <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
+            <Card variant="outlined" sx={{ flex: 1 }}>
+              <CardContent>
+                <Typography level="body-sm" color="success">
+                  Best Score
+                </Typography>
+                <Chip color="success" size="lg">
+                  {statistics.best_score}
+                </Chip>
+              </CardContent>
+            </Card>
+
+            <Card variant="outlined" sx={{ flex: 1 }}>
+              <CardContent>
+                <Typography level="body-sm" color="danger">
+                  Lowest Score
+                </Typography>
+                <Chip color="danger" size="lg">
+                  {statistics.worst_score}
+                </Chip>
+              </CardContent>
+            </Card>
+
+            <Card variant="outlined" sx={{ flex: 1 }}>
+              <CardContent>
+                <Typography level="body-sm" color="primary">
+                  Practice Time
+                </Typography>
+                <Chip color="primary" size="lg">
+                  {Math.round(statistics.total_practice_time / 60)}h
+                </Chip>
+              </CardContent>
+            </Card>
+
+            <Card variant="outlined" sx={{ flex: 1 }}>
+              <CardContent>
+                <Typography level="body-sm" color="neutral">
+                  Score Range
+                </Typography>
+                <Chip color="neutral" size="lg">
+                  {statistics.best_score - statistics.worst_score}
+                </Chip>
+              </CardContent>
+            </Card>
+          </Stack>
+
+          {/* Position Breakdown (if multiple positions) */}
+          {positionBreakdown.length > 1 && (
+            <Card variant="outlined" sx={{ mb: 4 }}>
+              <CardContent>
+                <Typography level="title-md" sx={{ mb: 2 }}>
+                  Position Breakdown
+                </Typography>
+                <Stack direction="row" spacing={2} flexWrap="wrap">
+                  {positionBreakdown.map((breakdown) => (
+                    <Box key={breakdown.position} sx={{ minWidth: 150 }}>
+                      <Typography level="body-sm" color="neutral">
+                        {PositionLabels[breakdown.position as PositionKey] || breakdown.position}
+                      </Typography>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip size="sm" color="primary">
+                          {breakdown.question_count} questions
+                        </Chip>
+                        <Chip size="sm" color="success">
+                          {Math.round(breakdown.average_score)} avg
+                        </Chip>
+                      </Stack>
+                    </Box>
+                  ))}
+                </Stack>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Daily Progress Chart */}
           <Card variant="outlined">
@@ -277,56 +244,32 @@ export default function ProgressChart({ username, selectedPosition }: ProgressCh
               <Typography level="title-md" sx={{ mb: 3 }}>
                 Daily Performance Trend
               </Typography>
-              <Stack spacing={2}>
-                {progressData.map((day) => (
-                  <Box key={day.date}>
-                    <Stack
-                      direction="row"
-                      justifyContent="space-between"
-                      alignItems="center"
-                      sx={{ mb: 1 }}
-                    >
-                      <Typography level="body-sm">{day.date}</Typography>
-                      <Stack direction="row" spacing={2} alignItems="center">
-                        <Typography level="body-sm" color="neutral">
-                          Practiced {day.count} questions
-                        </Typography>
-                        {day.score > 0 && (
-                          <Chip
-                            size="sm"
-                            color={
-                              day.score >= 80 ? "success" : day.score >= 70 ? "warning" : "danger"
-                            }
-                          >
-                            {day.score} points
-                          </Chip>
-                        )}
-                      </Stack>
-                    </Stack>
-
-                    <LinearProgress
-                      determinate
-                      value={day.score > 0 ? (day.score / maxScore) * 100 : 0}
-                      color={
-                        day.score >= 80
-                          ? "success"
-                          : day.score >= 70
-                          ? "warning"
-                          : day.score > 0
-                          ? "danger"
-                          : "neutral"
-                      }
-                      sx={{ height: 8, mb: 1 }}
-                    />
-
-                    {day.count === 0 && (
-                      <Typography level="body-xs" color="neutral" sx={{ fontStyle: "italic" }}>
-                        No practice
-                      </Typography>
-                    )}
-                  </Box>
-                ))}
-              </Stack>
+              {chartData.length > 0 ? (
+                <BarChart
+                  dataset={chartData}
+                  xAxis={[
+                    {
+                      dataKey: "date",
+                      label: "Date",
+                      tickPlacement: "middle",
+                      tickLabelPlacement: "middle",
+                    },
+                  ]}
+                  series={[
+                    {
+                      dataKey: "score",
+                      label: "Average Score",
+                      color: "#1976d2",
+                    },
+                  ]}
+                  height={300}
+                  yAxis={[{ label: "Score", width: 60, min: 0, max: 100 }]}
+                />
+              ) : (
+                <Alert color="neutral" variant="soft">
+                  No daily data available for the selected time range.
+                </Alert>
+              )}
             </CardContent>
           </Card>
         </>

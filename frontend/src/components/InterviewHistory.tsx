@@ -22,6 +22,7 @@ import {
 import { type InterviewRecord, PositionLabels, type PositionKey } from "../types/interview";
 import { getInterviewRecords } from "../api/api";
 import InterviewRecordDetailsModal from "./InterviewRecordDetailsModal";
+import { useAuthStore } from "../stores/useAuthStore";
 
 interface InterviewHistoryProps {
   selectedPosition: string;
@@ -33,15 +34,8 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
   const [filterPosition, setFilterPosition] = useState<string>(selectedPosition || "all");
   const [selectedRecord, setSelectedRecord] = useState<InterviewRecord | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [userId, setUserId] = useState<number>(0);
 
-  useEffect(() => {
-    const savedUserId = localStorage.getItem("user_id");
-    if (savedUserId) {
-      const userIdValue = Number(savedUserId);
-      setUserId(userIdValue);
-    }
-  }, []);
+  const userId = useAuthStore((state) => state.user_id);
 
   const filterRecords = useCallback(() => {
     if (filterPosition === "all") {
@@ -62,7 +56,7 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
   }, [selectedPosition]);
 
   const loadRecords = useCallback(async () => {
-    if (userId === 0) return;
+    if (userId === undefined) return;
 
     try {
       const res = await getInterviewRecords(userId, {

@@ -24,6 +24,12 @@ export enum SessionType {
   MOCK_INTERVIEW = "mock_interview",
 }
 
+export enum QuestionType {
+  OPINION = "opinion",
+  TECHNICAL = "technical",
+  BEHAVIORAL = "behavioral",
+}
+
 export interface Message {
   id: string;
   sender: "ai" | "user";
@@ -41,7 +47,7 @@ export interface Message {
 export interface GenerateQuestionRequest {
   position: PositionKey;
   difficulty: Difficulty | null;
-  topic: string | null;
+  question_type: QuestionType;
   user_id: number;
 }
 
@@ -50,7 +56,7 @@ export interface GenerateQuestionResponse {
   content: string;
   position: string;
   difficulty: string;
-  topic: string | null;
+  question_type: QuestionType;
   expected_keywords: string[];
   created_at: string;
 }
@@ -149,3 +155,75 @@ export interface CompleteSessionResponse {
   completed_at: string;
   summary: SessionSummary;
 }
+
+// News Question Push related types
+export interface NewsQuestion {
+  id: string;
+  content: string;
+  position: string;
+  difficulty: string;
+  source_title: string;
+  source_url: string;
+  published_at: string;
+  relevance_score: number;
+  question_type: QuestionType;
+  ai_reasoning: string;
+  created_at: string;
+}
+
+export interface TrendingQuestionResponse {
+  questions: NewsQuestion[];
+  total_count: number;
+}
+
+export interface UserPreferences {
+  preferred_position: string;
+  difficulty_level: string;
+  daily_question_goal: number;
+  notification_settings: {
+    daily_reminder: boolean;
+    progress_updates: boolean;
+    achievement_alerts: boolean;
+  };
+}
+
+export interface PushHistory {
+  userId: string;
+  pushes: Array<{
+    questionId: string;
+    pushedAt: string;
+    status: "pending" | "answered" | "dismissed";
+    answeredAt?: string;
+  }>;
+}
+
+// Progress Analytics types
+export interface ProgressData {
+  date: string;
+  score: number;
+  question_count: number;
+}
+
+export interface PositionBreakdown {
+  position: string;
+  question_count: number;
+  average_score: number;
+}
+
+export interface ProgressStatistics {
+  total_questions: number;
+  average_score: number;
+  improvement_rate: number;
+  best_score: number;
+  worst_score: number;
+  current_streak: number;
+  total_practice_time: number;
+}
+
+export interface GetProgressResponse {
+  progress_data: ProgressData[];
+  statistics: ProgressStatistics;
+  position_breakdown: PositionBreakdown[];
+}
+
+export type NewsCategory = "ai" | "web_dev" | "mobile" | "devops" | "general_tech";

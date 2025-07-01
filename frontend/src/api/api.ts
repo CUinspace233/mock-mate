@@ -12,6 +12,10 @@ import type {
   GetInterviewRecordsResponse,
   CompleteSessionRequest,
   CompleteSessionResponse,
+  TrendingQuestionResponse,
+  UserPreferences,
+  NewsCategory,
+  GetProgressResponse,
 } from "../types/interview";
 
 export async function login(username: string, password: string) {
@@ -101,6 +105,47 @@ export async function completeSession(
   const res = await axios.put(
     `${import.meta.env.VITE_API_URL}/api/sessions/${sessionId}/complete`,
     request,
+  );
+  return res.data;
+}
+
+export async function getTrendingQuestions(params?: {
+  position?: string;
+  category?: NewsCategory;
+  limit?: number;
+  days_back?: number;
+}): Promise<TrendingQuestionResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.position) searchParams.append("position", params.position);
+  if (params?.category) searchParams.append("category", params.category);
+  if (params?.limit !== undefined) searchParams.append("limit", params.limit.toString());
+  if (params?.days_back !== undefined)
+    searchParams.append("days_back", params.days_back.toString());
+
+  const res = await axios.get(
+    `${import.meta.env.VITE_API_URL}/api/trending/trending-questions?${searchParams.toString()}`,
+  );
+  return res.data;
+}
+
+export async function getUserPreferences(userId: number): Promise<UserPreferences> {
+  const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/users/${userId}/preferences`);
+  return res.data;
+}
+
+export async function getUserProgress(
+  userId: number,
+  params?: {
+    position?: string;
+    time_range?: "7days" | "30days" | "90days";
+  },
+): Promise<GetProgressResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.position) searchParams.append("position", params.position);
+  if (params?.time_range) searchParams.append("time_range", params.time_range);
+
+  const res = await axios.get(
+    `${import.meta.env.VITE_API_URL}/api/users/${userId}/progress?${searchParams.toString()}`,
   );
   return res.data;
 }

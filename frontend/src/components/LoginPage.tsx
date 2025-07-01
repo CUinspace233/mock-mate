@@ -47,7 +47,6 @@ export default function LoginPage({ onLoginSuccess, onSwitchToRegister }: LoginP
     }
   };
 
-  // Handle trial account login
   const handleDemoLogin = async () => {
     setDemoLoading(true);
     setError("");
@@ -88,11 +87,11 @@ export default function LoginPage({ onLoginSuccess, onSwitchToRegister }: LoginP
       >
         <CardContent sx={{ gap: 2 }}>
           <Box sx={{ textAlign: "center", mb: 3 }}>
-            <Typography level="h2" component="h1">
-              Welcome Back
+            <Typography level="h2" component="h1" sx={{ fontSize: "2.5rem" }}>
+              Mock Mate
             </Typography>
             <Typography level="body-sm" color="neutral">
-              Please log in to your account
+              Your AI Interview Coach
             </Typography>
           </Box>
 
@@ -144,10 +143,6 @@ export default function LoginPage({ onLoginSuccess, onSwitchToRegister }: LoginP
             Try with Demo Account
           </Button>
 
-          <Typography level="body-xs" color="neutral" sx={{ textAlign: "center", mb: 2 }}>
-            Quick access with demo_account credentials
-          </Typography>
-
           <Box sx={{ textAlign: "center" }}>
             <Typography level="body-sm" color="neutral">
               Don't have an account?{" "}
@@ -155,7 +150,7 @@ export default function LoginPage({ onLoginSuccess, onSwitchToRegister }: LoginP
                 variant="plain"
                 size="sm"
                 onClick={onSwitchToRegister}
-                sx={{ p: 0, fontWeight: "bold" }}
+                sx={{ p: 1, fontWeight: "bold" }}
               >
                 Sign up here
               </Button>

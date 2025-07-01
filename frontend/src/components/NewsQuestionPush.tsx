@@ -66,9 +66,6 @@ export default function NewsQuestionPush({
         .catch((err) => {
           setError("Failed to start push service: " + err.message);
         });
-    } else if (pushServiceRef.current && isInterviewActive && isServiceStarted) {
-      // Pause during interview but don't stop completely
-      console.log("Interview active, push service will skip notifications");
     }
   }, [isInterviewActive, isServiceStarted]);
 
@@ -78,7 +75,6 @@ export default function NewsQuestionPush({
     }
     setShowPushModal(false);
 
-    // Pass the complete news question object
     if (currentQuestion) {
       onStartAnswering(questionId, currentQuestion);
     }
@@ -100,10 +96,8 @@ export default function NewsQuestionPush({
 
   const handleCloseModal = () => {
     setShowPushModal(false);
-    // Don't clear currentQuestion here in case user reopens
   };
 
-  // Handle manual fetch of news questions
   const handleManualFetch = async () => {
     setIsLoadingManual(true);
     setError("");
@@ -136,7 +130,6 @@ export default function NewsQuestionPush({
     }
   };
 
-  // Component to render the manual fetch button
   const ManualFetchButton = () => (
     <Button
       variant="outlined"
@@ -156,7 +149,6 @@ export default function NewsQuestionPush({
 
   return (
     <>
-      {/* Manual Fetch Button - expose this component */}
       {ManualFetchButton()}
 
       {/* Error Alert */}
@@ -182,135 +174,6 @@ export default function NewsQuestionPush({
       <Modal
         open={showPushModal && currentQuestion !== null}
         onClose={handleCloseModal}
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          p: 2,
-        }}
-      >
-        <ModalDialog
-          variant="outlined"
-          sx={{
-            maxWidth: "95vw",
-            maxHeight: "95vh",
-            overflow: "auto",
-            p: 0,
-          }}
-        >
-          <ModalClose />
-          <Box sx={{ p: 1 }}>
-            {currentQuestion && (
-              <NewsQuestionCard
-                question={currentQuestion}
-                onAnswer={handleStartAnswer}
-                onDismiss={handleDismiss}
-              />
-            )}
-          </Box>
-        </ModalDialog>
-      </Modal>
-    </>
-  );
-}
-
-// Export the manual fetch button as a separate component
-export function NewsQuestionButton({
-  selectedPosition,
-  onStartAnswering,
-}: {
-  selectedPosition: string;
-  onStartAnswering: (questionId: string, newsQuestion: NewsQuestion) => void;
-}) {
-  const [currentQuestion, setCurrentQuestion] = useState<NewsQuestion | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string>("");
-
-  const handleFetch = async () => {
-    setIsLoading(true);
-    setError("");
-
-    try {
-      const response = await getTrendingQuestions({
-        position: selectedPosition,
-        limit: 1,
-        days_back: 7,
-      });
-
-      if (response.questions.length === 0) {
-        setError("No related news question, please try again later");
-        return;
-      }
-
-      const question = response.questions[0];
-      if (!question) {
-        setError("No related news question, please try again later");
-        return;
-      }
-      setCurrentQuestion(question);
-      setShowModal(true);
-    } catch (err: unknown) {
-      setError(
-        "Failed to fetch news question: " + (err instanceof Error ? err.message : "network error"),
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleStartAnswer = (questionId: string) => {
-    setShowModal(false);
-
-    // Pass the complete news question object
-    if (currentQuestion) {
-      onStartAnswering(questionId, currentQuestion);
-    }
-    setCurrentQuestion(null);
-  };
-
-  const handleDismiss = () => {
-    setShowModal(false);
-    setCurrentQuestion(null);
-  };
-
-  return (
-    <>
-      <Button
-        variant="outlined"
-        color="primary"
-        size="sm"
-        onClick={handleFetch}
-        loading={isLoading}
-        startDecorator={!isLoading && <Newspaper />}
-        sx={{
-          flex: { xs: 1, sm: "none" },
-          minWidth: { sm: 140 },
-        }}
-      >
-        {isLoading ? "Fetching..." : "Daily Trending Question"}
-      </Button>
-
-      {/* Error display */}
-      {error && (
-        <Alert
-          color="warning"
-          variant="soft"
-          sx={{ mt: 1 }}
-          endDecorator={
-            <Button size="sm" variant="plain" onClick={() => setError("")}>
-              ×
-            </Button>
-          }
-        >
-          <Typography level="body-sm">{error}</Typography>
-        </Alert>
-      )}
-
-      {/* Modal */}
-      <Modal
-        open={showModal && currentQuestion !== null}
-        onClose={() => setShowModal(false)}
         sx={{
           display: "flex",
           justifyContent: "center",

@@ -47,8 +47,6 @@ export class NewsQuestionPushService {
           console.error("Failed to fetch preferences or push news question:", error);
         }
       }, NewsQuestionPushService.PUSH_INTERVAL);
-
-      console.log("News question push service started");
     } catch (error) {
       console.error("Failed to start push service:", error);
     }
@@ -64,8 +62,6 @@ export class NewsQuestionPushService {
     // Clear all reminder timers
     this.reminderTimers.forEach((timer) => clearTimeout(timer));
     this.reminderTimers.clear();
-
-    console.log("News question push service stopped");
   }
 
   // Main push logic
@@ -73,7 +69,6 @@ export class NewsQuestionPushService {
     try {
       // Check if user is currently in interview (skip pushing during active sessions)
       if (this.isUserInInterview()) {
-        console.log("User is in interview, skipping push");
         return;
       }
 
@@ -85,19 +80,19 @@ export class NewsQuestionPushService {
       });
 
       if (response.questions.length === 0) {
-        console.log("No trending questions available");
+        // No trending questions available
         return;
       }
 
       const question = response.questions[0];
       if (!question) {
-        console.log("No trending questions available");
+        // No trending questions available
         return;
       }
 
       // Check if we've already pushed this question recently
       if (this.isQuestionRecentlyPushed(question.id)) {
-        console.log("Question already pushed recently, skipping");
+        // Question already pushed recently, skipping
         return;
       }
 
@@ -197,7 +192,6 @@ export class NewsQuestionPushService {
     }, NewsQuestionPushService.REMINDER_INTERVAL);
 
     this.reminderTimers.set(question.id, timerId);
-    console.log(`Reminder set for question ${question.id} in 1 hour`);
   }
 
   // Clear a specific reminder

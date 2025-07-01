@@ -168,9 +168,9 @@ export default function RegisterPage({ onRegisterSuccess, onSwitchToLogin }: Reg
                 variant="plain"
                 size="sm"
                 onClick={onSwitchToLogin}
-                sx={{ p: 0, fontWeight: "bold", textDecoration: "underline" }}
+                sx={{ p: 1, fontWeight: "bold" }}
               >
-                Sign in here
+                Log in here
               </Button>
             </Typography>
           </Box>

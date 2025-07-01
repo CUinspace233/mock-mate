@@ -41,7 +41,6 @@ export default function ProgressChart({ userId, selectedPosition }: ProgressChar
     } catch (err) {
       console.error("Failed to load progress data:", err);
       setError("Failed to load progress data. Please try again.");
-      // Reset to empty states on error
       setProgressData([]);
       setStatistics(null);
       setPositionBreakdown([]);
@@ -54,7 +53,6 @@ export default function ProgressChart({ userId, selectedPosition }: ProgressChar
     loadProgressData();
   }, [loadProgressData]);
 
-  // Format chart data for display
   const chartData = progressData.map((item) => ({
     date: new Date(item.date).toLocaleDateString(),
     score: item.score,

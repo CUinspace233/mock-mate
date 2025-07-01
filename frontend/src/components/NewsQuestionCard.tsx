@@ -68,10 +68,10 @@ export default function NewsQuestionCard({
     <Card
       variant="outlined"
       sx={{
-        maxWidth: 480,
         boxShadow: "lg",
-        border: "2px solid",
+        border: "1px solid",
         borderColor: "primary.200",
+        maxWidth: 480,
         position: "relative",
       }}
     >
@@ -177,7 +177,7 @@ export default function NewsQuestionCard({
           )}
         </Box>
 
-        {/* AI Reasoning (Optional) */}
+        {/* AI Reasoning */}
         {isExpanded && question.ai_reasoning && (
           <Sheet variant="soft" color="neutral" sx={{ p: 2, mb: 2, borderRadius: "sm" }}>
             <Typography level="body-sm" color="neutral" sx={{ fontStyle: "italic" }}>
@@ -196,7 +196,7 @@ export default function NewsQuestionCard({
             onClick={() => onAnswer(question.id)}
             sx={{ flex: 1 }}
           >
-            I'll answer
+            Answer now
           </Button>
 
           <Button

@@ -75,7 +75,6 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const [currentQuestion, setCurrentQuestion] = useState<Message | null>(null);
   const [awaitingAnswer, setAwaitingAnswer] = useState(false);
 
-  // Add state for news question
   const [pendingNewsQuestion, setPendingNewsQuestion] = useState<NewsQuestion | null>(null);
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -133,7 +132,6 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
     setDailyQuestionDate(new Date().toISOString().slice(0, 10));
   };
 
-  // Modified function to handle news question
   const handleStartInterviewWithNews = async (newsQuestion?: NewsQuestion) => {
     try {
       const res = await startInterviewSession({
@@ -143,7 +141,6 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
       setSessionId(res.session_id);
       setInterviewStarted(true);
 
-      // Set the news question if provided
       if (newsQuestion) {
         setPendingNewsQuestion(newsQuestion);
       }
@@ -198,7 +195,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
               <Chip color="primary" variant="soft" sx={{ textAlign: "center" }}>
                 Today's Practice: {dailyQuestionCount} questions
               </Chip>
-              <Stack direction="row" spacing={1} sx={{ width: { xs: "100%", sm: "auto" } }}>
+              <Stack direction="row" spacing={1.5} sx={{ width: { xs: "100%", sm: "auto" } }}>
                 <Button
                   variant="outlined"
                   size="sm"
@@ -218,28 +215,27 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
               </Stack>
             </Stack>
           </Stack>
-        </CardContent>
-      </Card>
+          {/* Daily Trending Question */}
+          <Stack direction={{ xs: "column", lg: "row" }} spacing={{ xs: 2, lg: 3 }} sx={{ mt: 2 }}>
+            {/* Left side spacer or content area for large screens */}
+            <Box sx={{ display: { xs: "none", lg: "block" }, flex: 1 }} />
 
-      {/* Daily Trending Question */}
-      <Card variant="outlined" sx={{ mb: { xs: 2, sm: 3 } }}>
-        <CardContent>
-          <NewsQuestionPush
-            userId={user_id || 0}
-            selectedPosition={selectedPosition}
-            onStartAnswering={(questionId, newsQuestion) => {
-              // Switch to chat tab and start interview with specific question
-              setActiveTab(0);
-              if (!interviewStarted) {
-                handleStartInterviewWithNews(newsQuestion);
-              } else {
-                // If interview is already started, just set the news question
-                setPendingNewsQuestion(newsQuestion);
-              }
-              console.log("Starting interview with news question:", questionId);
-            }}
-            isInterviewActive={interviewStarted}
-          />
+            <NewsQuestionPush
+              userId={user_id || 0}
+              selectedPosition={selectedPosition}
+              onStartAnswering={(_, newsQuestion) => {
+                // Switch to chat tab and start interview with specific question
+                setActiveTab(0);
+                if (!interviewStarted) {
+                  handleStartInterviewWithNews(newsQuestion);
+                } else {
+                  // If interview is already started, just set the news question
+                  setPendingNewsQuestion(newsQuestion);
+                }
+              }}
+              isInterviewActive={interviewStarted}
+            />
+          </Stack>
         </CardContent>
       </Card>
 

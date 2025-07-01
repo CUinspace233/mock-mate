@@ -3,16 +3,27 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.endpoints import user, questions, answers, sessions
+from api.endpoints import user, questions, answers, sessions, trending
 from database.models import Base
 from database.session import engine
+from scheduler import start_scheduler
+
+scheduler = None
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(app: FastAPI):
+    global scheduler
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    scheduler = start_scheduler()
+    print("🚀 News scheduler started!")
+
     yield
+
+    if scheduler:
+        scheduler.shutdown()
 
 
 app = FastAPI(
@@ -35,6 +46,7 @@ app.include_router(user.router, prefix="/api/users", tags=["Users"])
 app.include_router(questions.router, prefix="/api/questions", tags=["Questions"])
 app.include_router(answers.router, prefix="/api/answers", tags=["Answers"])
 app.include_router(sessions.router, prefix="/api/sessions", tags=["Sessions"])
+app.include_router(trending.router, prefix="/api/trending", tags=["Trending Questions"])
 
 
 @app.get("/")

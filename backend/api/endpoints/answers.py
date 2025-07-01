@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from database import models
 from api.deps import get_db
 from datetime import datetime, UTC
@@ -168,11 +169,27 @@ async def evaluate_answer(request: EvaluateAnswerRequest, db: AsyncSession = Dep
         question = question_result.scalar_one_or_none()
 
         if not question:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+            # Try to get from news_based_questions, and eager load the related Question
+            news_question_stmt = (
+                select(models.NewsBasedQuestion)
+                .where(models.NewsBasedQuestion.id == request.question_id)
+                .options(selectinload(models.NewsBasedQuestion.question))
+            )
+            news_question_result = await db.execute(news_question_stmt)
+            news_question = news_question_result.scalar_one_or_none()
+            if not news_question:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Question not found"
+                )
+            question_content = news_question.question.content
+            expected_keywords = news_question.question.expected_keywords
+        else:
+            question_content = question.content
+            expected_keywords = question.expected_keywords
 
         # Evaluate the answer using AI
         evaluation = await evaluate_answer_ai(
-            question.content or "", request.answer, question.expected_keywords or []
+            question_content or "", request.answer, expected_keywords or []
         )
 
         answer_evaluation = models.AnswerEvaluation(

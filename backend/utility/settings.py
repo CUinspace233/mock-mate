@@ -9,6 +9,7 @@ load_dotenv()
 class Settings(BaseSettings):
     host_ip: str = "0.0.0.0"
     service_port: int = 5200
+    api_url: str = "http://localhost:5200"
 
     openai_api_key: str = ""
 

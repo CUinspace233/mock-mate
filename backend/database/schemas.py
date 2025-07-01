@@ -29,6 +29,12 @@ class SessionType(str, Enum):
     MOCK_INTERVIEW = "mock_interview"
 
 
+class QuestionType(str, Enum):
+    OPINION = "opinion"
+    TECHNICAL = "technical"
+    BEHAVIORAL = "behavioral"
+
+
 # User
 class UserBase(BaseModel):
     username: str
@@ -63,7 +69,7 @@ class QuestionBase(BaseModel):
     content: str
     position: Position
     difficulty: Difficulty | None = Difficulty.MEDIUM
-    topic: str | None = None
+    question_type: QuestionType | None = QuestionType.TECHNICAL
     expected_keywords: list[str] = []
 
 
@@ -82,7 +88,7 @@ class QuestionOut(QuestionBase):
 class GenerateQuestionRequest(BaseModel):
     position: Position
     difficulty: Difficulty | None = Difficulty.MEDIUM
-    topic: str | None = None
+    question_type: QuestionType | None = QuestionType.TECHNICAL
     user_id: int
 
 
@@ -91,16 +97,16 @@ class GenerateQuestionResponse(BaseModel):
     content: str
     position: str
     difficulty: str
-    topic: str | None
+    question_type: QuestionType | None = QuestionType.TECHNICAL
     expected_keywords: list[str]
     created_at: datetime
 
 
 class GeneratedQuestion(BaseModel):
     content: str
+    question_type: QuestionType
     position: str
     difficulty: str
-    topic: str
     expected_keywords: list[str]
 
 
@@ -293,13 +299,13 @@ class QuestionCategory(BaseModel):
 
 class TopicCount(BaseModel):
     position: str
-    topic: str
+    question_type: str
     count: int
 
 
 class QuestionCategoriesResponse(BaseModel):
     positions: list[QuestionCategory]
-    topics: list[TopicCount]
+    question_types: list[TopicCount]
 
 
 # Legacy schemas for backward compatibility
@@ -315,3 +321,110 @@ class InterviewOut(InterviewCreate):
 
     class Config:
         from_attributes = True
+
+
+# News and Trending Topics
+class NewsSourceType(str, Enum):
+    RSS = "rss"
+    API = "api"
+    WEB_SCRAPING = "web_scraping"
+
+
+class NewsCategory(str, Enum):
+    AI = "ai"
+    WEB_DEV = "web_dev"
+    MOBILE = "mobile"
+    DEVOPS = "devops"
+    GENERAL_TECH = "general_tech"
+
+
+class NewsSourceBase(BaseModel):
+    name: str
+    source_type: NewsSourceType
+    url: str
+    category: NewsCategory
+    is_active: bool = True
+
+
+class NewsSourceOut(NewsSourceBase):
+    id: str
+    last_fetched: datetime | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class NewsItemBase(BaseModel):
+    title: str
+    summary: str | None = None
+    content: str | None = None
+    url: str
+    published_at: datetime
+    category: NewsCategory
+
+
+class NewsItemOut(NewsItemBase):
+    id: str
+    source_id: str
+    is_processed: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class NewsBasedQuestionOut(BaseModel):
+    id: str
+    news_item_id: str
+    question_id: str
+    relevance_score: float
+    question_type: QuestionType
+    ai_reasoning: str | None = None
+    created_at: datetime
+
+    # Nested question and news item data
+    question: QuestionOut
+    news_item: NewsItemOut
+
+    class Config:
+        from_attributes = True
+
+
+class TrendingQuestionResponse(BaseModel):
+    """Response for trending/news-based questions"""
+
+    id: str
+    content: str
+    position: str
+    difficulty: str
+    question_type: QuestionType
+    source_title: str
+    source_url: str
+    published_at: datetime
+    relevance_score: float
+    ai_reasoning: str | None = None
+    created_at: datetime
+
+
+class FetchNewsRequest(BaseModel):
+    category: NewsCategory | None = None
+    limit: int = 10
+
+
+class FetchNewsResponse(BaseModel):
+    news_items: list[NewsItemOut]
+    questions_generated: int
+    message: str
+
+
+class GetTrendingQuestionsRequest(BaseModel):
+    position: Position | None = None
+    category: NewsCategory | None = None
+    limit: int = 5
+    days_back: int = 7  # How many days back to look for news
+
+
+class GetTrendingQuestionsResponse(BaseModel):
+    questions: list[TrendingQuestionResponse]
+    total_count: int

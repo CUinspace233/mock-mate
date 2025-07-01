@@ -39,7 +39,7 @@ class Question(Base):
         String(50), nullable=False
     )  # frontend, backend, fullstack, etc.
     difficulty: Mapped[str] = mapped_column(String(20), default="medium")  # easy, medium, hard
-    topic: Mapped[str] = mapped_column(String(100))
+    question_type: Mapped[str] = mapped_column(String(20), default="technical")  # opinion, technical, behavioral
     expected_keywords: Mapped[list[str]] = mapped_column(JSON)  # list of expected keywords
     created_at: Mapped[datetime] = mapped_column(default=datetime.now(UTC))
 
@@ -121,3 +121,74 @@ class AnswerEvaluation(Base):
     keywords_missed: Mapped[list[str]] = mapped_column(JSON)  # list of keywords missed
     evaluation_details: Mapped[dict] = mapped_column(JSON)  # Detailed scoring breakdown
     created_at: Mapped[datetime] = mapped_column(default=datetime.now(UTC))
+
+
+class NewsSource(Base):
+    """Store news sources and their configuration"""
+
+    __tablename__ = "news_sources"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name: Mapped[str] = mapped_column(
+        String(100), nullable=False
+    )  # "Google News - AI", "Hacker News" etc.
+    source_type: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )  # "rss", "api", "web_scraping"
+    url: Mapped[str] = mapped_column(String(500), nullable=False)  # RSS feed URL or API endpoint
+    category: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )  # "AI", "web_dev", "mobile", etc.
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_fetched: Mapped[datetime | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now(UTC))
+
+    # Relationships
+    news_items: Mapped[list["NewsItem"]] = relationship("NewsItem", back_populates="source")
+
+
+class NewsItem(Base):
+    """Store individual news items fetched from sources"""
+
+    __tablename__ = "news_items"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    source_id: Mapped[str] = mapped_column(String, ForeignKey("news_sources.id"), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=True)
+    content: Mapped[str] = mapped_column(Text, nullable=True)
+    url: Mapped[str] = mapped_column(String(1000), nullable=False)
+    published_at: Mapped[datetime] = mapped_column(nullable=False)
+    category: Mapped[str] = mapped_column(String(50), nullable=False)
+    is_processed: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # Whether AI has analyzed this
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now(UTC))
+
+    # Relationships
+    source: Mapped["NewsSource"] = relationship("NewsSource", back_populates="news_items")
+    generated_questions: Mapped[list["NewsBasedQuestion"]] = relationship(
+        "NewsBasedQuestion", back_populates="news_item"
+    )
+
+
+class NewsBasedQuestion(Base):
+    """Questions generated from news items"""
+
+    __tablename__ = "news_based_questions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    news_item_id: Mapped[str] = mapped_column(String, ForeignKey("news_items.id"), nullable=False)
+    question_id: Mapped[str] = mapped_column(String, ForeignKey("questions.id"), nullable=False)
+    relevance_score: Mapped[float] = mapped_column(nullable=False)  # 0.0 to 1.0
+    question_type: Mapped[str] = mapped_column(
+        String(50), default="opinion"
+    )  # "opinion", "technical", "behavioral"
+    ai_reasoning: Mapped[str] = mapped_column(
+        Text, nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now(UTC))
+
+    # Relationships
+    news_item: Mapped["NewsItem"] = relationship("NewsItem", back_populates="generated_questions")
+    question: Mapped["Question"] = relationship("Question")

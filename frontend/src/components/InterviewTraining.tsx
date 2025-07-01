@@ -27,8 +27,11 @@ import InterviewHistory from "./InterviewHistory.tsx";
 import ProgressChart from "./ProgressChart.tsx";
 import { startInterviewSession, completeSession } from "../api/api";
 import type { Message, PositionKey } from "../types/interview.ts";
-import { Difficulty } from "../types/interview";
+import { Difficulty, QuestionType } from "../types/interview";
 import { getDifficultyColor } from "../utils";
+import NewsQuestionPush from "./NewsQuestionPush.tsx";
+import type { NewsQuestion } from "../types/interview.ts";
+import { useAuthStore } from "../stores/useAuthStore.ts";
 
 interface InterviewTrainingProps {
   username: string;
@@ -50,54 +53,57 @@ const jobPositions = [
 ];
 
 export default function InterviewTraining({ username, onLogout }: InterviewTrainingProps) {
-  const [selectedPosition, setSelectedPosition] = useState<string>("frontend");
+  // zustand hooks
+  const user_id = useAuthStore((state) => state.user_id);
+  const dailyQuestionCount = useAuthStore((state) => state.dailyQuestionCount);
+  const setDailyQuestionCount = useAuthStore((state) => state.setDailyQuestionCount);
+  const dailyQuestionDate = useAuthStore((state) => state.dailyQuestionDate);
+  const setDailyQuestionDate = useAuthStore((state) => state.setDailyQuestionDate);
+  const selectedPosition = useAuthStore((state) => state.selectedPosition);
+  const setSelectedPosition = useAuthStore((state) => state.setSelectedPosition);
+  const sessionId = useAuthStore((state) => state.sessionId);
+  const setSessionId = useAuthStore((state) => state.setSessionId);
+
   const [activeTab, setActiveTab] = useState<number>(0);
-  const [interviewStarted, setInterviewStarted] = useState<boolean>(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [dailyQuestionCount, setDailyQuestionCount] = useState<number>(0);
-  const [user_id, setUserId] = useState<number>(0);
+  const [interviewStarted, setInterviewStarted] = useState<boolean>(!!sessionId);
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>(Difficulty.EASY);
+  const [selectedQuestionType, setSelectedQuestionType] = useState<QuestionType>(
+    QuestionType.TECHNICAL,
+  );
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<Message | null>(null);
   const [awaitingAnswer, setAwaitingAnswer] = useState(false);
 
+  // Add state for news question
+  const [pendingNewsQuestion, setPendingNewsQuestion] = useState<NewsQuestion | null>(null);
   useEffect(() => {
-    const savedPosition = localStorage.getItem(`${username}_selectedPosition`);
-    const savedQuestionCount = localStorage.getItem(`${username}_dailyQuestionCount`);
-    const savedUserId = localStorage.getItem("user_id");
-    if (savedUserId) {
-      setUserId(Number(savedUserId));
+    const today = new Date().toISOString().slice(0, 10);
+    if (dailyQuestionDate !== today) {
+      setDailyQuestionCount(0);
+      setDailyQuestionDate(today);
     }
-    if (savedPosition) {
-      setSelectedPosition(savedPosition);
-    }
-    if (savedQuestionCount) {
-      setDailyQuestionCount(parseInt(savedQuestionCount));
-    }
-    const savedSessionId = localStorage.getItem(`${username}_sessionId`);
-    if (savedSessionId && !interviewStarted) {
+    if (sessionId && !interviewStarted) {
       (async () => {
-        await handleInterviewComplete(savedSessionId);
+        await handleInterviewComplete(sessionId);
       })();
     }
+    // eslint-disable-next-line
   }, [username, user_id]);
 
   const handlePositionChange = (position: string) => {
     setSelectedPosition(position);
-    localStorage.setItem(`${username}_selectedPosition`, position);
     setInterviewStarted(false);
   };
 
   const handleStartInterview = async () => {
     try {
       const res = await startInterviewSession({
-        user_id,
+        user_id: user_id || 0,
         position: selectedPosition as PositionKey,
       });
       setSessionId(res.session_id);
       setInterviewStarted(true);
-      localStorage.setItem(`${username}_sessionId`, res.session_id);
     } catch (err) {
       console.error(err);
     }
@@ -107,24 +113,48 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
     const realSessionId = sid || sessionId;
     if (!realSessionId) return;
     try {
-      await completeSession(realSessionId, { user_id });
+      await completeSession(realSessionId, { user_id: user_id || 0 });
     } catch (err) {
       console.error("Failed to complete session:", err);
     }
     const newCount = dailyQuestionCount + 1;
     setDailyQuestionCount(newCount);
-    localStorage.setItem(`${username}_dailyQuestionCount`, newCount.toString());
+    setDailyQuestionDate(new Date().toISOString().slice(0, 10));
     setInterviewStarted(false);
 
     setMessages([]);
     setCurrentQuestion(null);
     setAwaitingAnswer(false);
-    localStorage.removeItem(`${username}_sessionId`);
+    setSessionId(null);
   };
 
   const resetDailyProgress = () => {
     setDailyQuestionCount(0);
-    localStorage.setItem(`${username}_dailyQuestionCount`, "0");
+    setDailyQuestionDate(new Date().toISOString().slice(0, 10));
+  };
+
+  // Modified function to handle news question
+  const handleStartInterviewWithNews = async (newsQuestion?: NewsQuestion) => {
+    try {
+      const res = await startInterviewSession({
+        user_id: user_id || 0,
+        position: selectedPosition as PositionKey,
+      });
+      setSessionId(res.session_id);
+      setInterviewStarted(true);
+
+      // Set the news question if provided
+      if (newsQuestion) {
+        setPendingNewsQuestion(newsQuestion);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Function to clear news question after it's used
+  const handleNewsQuestionUsed = () => {
+    setPendingNewsQuestion(null);
   };
 
   return (
@@ -191,6 +221,28 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
         </CardContent>
       </Card>
 
+      {/* Daily Trending Question */}
+      <Card variant="outlined" sx={{ mb: { xs: 2, sm: 3 } }}>
+        <CardContent>
+          <NewsQuestionPush
+            userId={user_id || 0}
+            selectedPosition={selectedPosition}
+            onStartAnswering={(questionId, newsQuestion) => {
+              // Switch to chat tab and start interview with specific question
+              setActiveTab(0);
+              if (!interviewStarted) {
+                handleStartInterviewWithNews(newsQuestion);
+              } else {
+                // If interview is already started, just set the news question
+                setPendingNewsQuestion(newsQuestion);
+              }
+              console.log("Starting interview with news question:", questionId);
+            }}
+            isInterviewActive={interviewStarted}
+          />
+        </CardContent>
+      </Card>
+
       {/* Position Selection */}
       <Card variant="outlined" sx={{ mb: { xs: 2, sm: 3 } }}>
         <CardContent>
@@ -213,6 +265,20 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
                 </Option>
               ))}
             </Select>
+
+            <Typography level="title-md" sx={{ flexShrink: 0 }}>
+              Select Question Type:
+            </Typography>
+            <Select
+              value={selectedQuestionType}
+              onChange={(_, value) => value && setSelectedQuestionType(value as QuestionType)}
+              sx={{ minWidth: { xs: "100%", sm: 180 } }}
+            >
+              <Option value={QuestionType.TECHNICAL}>Technical</Option>
+              <Option value={QuestionType.BEHAVIORAL}>Behavioral</Option>
+              <Option value={QuestionType.OPINION}>Opinion</Option>
+            </Select>
+
             <Typography level="title-md" sx={{ flexShrink: 0 }}>
               Select Difficulty:
             </Typography>
@@ -275,7 +341,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
             <InterviewChat
               selectedPosition={selectedPosition}
               selectedDifficulty={selectedDifficulty}
-              user_id={user_id}
+              user_id={user_id || 0}
               interviewStarted={interviewStarted}
               sessionId={sessionId}
               onInterviewComplete={handleInterviewComplete}
@@ -286,6 +352,9 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
               setCurrentQuestion={setCurrentQuestion}
               awaitingAnswer={awaitingAnswer}
               setAwaitingAnswer={setAwaitingAnswer}
+              presetQuestion={pendingNewsQuestion}
+              onPresetQuestionUsed={handleNewsQuestionUsed}
+              questionType={selectedQuestionType}
             />
           </TabPanel>
 
@@ -294,7 +363,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
           </TabPanel>
 
           <TabPanel value={2} sx={{ p: 0 }}>
-            <ProgressChart username={username} selectedPosition={selectedPosition} />
+            <ProgressChart userId={user_id || 0} selectedPosition={selectedPosition} />
           </TabPanel>
         </Tabs>
       </Card>

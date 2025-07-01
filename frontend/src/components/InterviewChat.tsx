@@ -12,6 +12,9 @@ import {
   Alert,
   CircularProgress,
   Divider,
+  Modal,
+  ModalDialog,
+  ModalClose,
 } from "@mui/joy";
 import {
   Send as SendIcon,
@@ -20,6 +23,7 @@ import {
   Refresh as RefreshIcon,
   CheckCircle as CheckIcon,
   Cancel as CancelIcon,
+  ExitToApp as ExitIcon,
 } from "@mui/icons-material";
 import {
   generateQuestion as generateQuestionApi,
@@ -44,7 +48,7 @@ interface InterviewChatProps {
   user_id: number;
   interviewStarted: boolean;
   sessionId: string | null;
-  onInterviewComplete: () => void;
+  onInterviewComplete: () => Promise<void>;
   onInterviewStart: () => Promise<void>;
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -77,9 +81,11 @@ export default function InterviewChat({
 }: InterviewChatProps) {
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isCompletingInterview, setIsCompletingInterview] = useState(false);
   const [error, setError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showAlert, setShowAlert] = useState(true);
+  const [showEndSessionModal, setShowEndSessionModal] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -281,8 +287,24 @@ export default function InterviewChat({
     await onInterviewStart();
   };
 
-  const handleCompleteInterview = () => {
-    onInterviewComplete();
+  const handleCompleteInterview = async () => {
+    setIsCompletingInterview(true);
+    try {
+      await onInterviewComplete();
+    } catch (error) {
+      console.error("Failed to complete interview:", error);
+    } finally {
+      setIsCompletingInterview(false);
+    }
+  };
+
+  const handleEndSession = () => {
+    setShowEndSessionModal(true);
+  };
+
+  const handleConfirmEndSession = async () => {
+    setShowEndSessionModal(false);
+    await handleCompleteInterview();
   };
 
   if (!interviewStarted && messages.length === 0) {
@@ -296,8 +318,14 @@ export default function InterviewChat({
           <br />
           click 'Get Interview Questions' to receive AI-generated interview questions.
         </Typography>
-        <Button size="lg" startDecorator={<RobotIcon />} onClick={handleStartNewQuestion}>
-          Get Interview Questions
+        <Button
+          size="lg"
+          startDecorator={isLoading ? undefined : <RobotIcon />}
+          onClick={handleStartNewQuestion}
+          loading={isLoading}
+          disabled={isLoading}
+        >
+          {isLoading ? "Generating Questions..." : "Get Interview Questions"}
         </Button>
       </Box>
     );
@@ -447,9 +475,19 @@ export default function InterviewChat({
                 >
                   Send Answer
                 </Button>
+
                 <Typography level="body-xs" color="neutral">
                   Ctrl/Cmd+Enter to send
                 </Typography>
+                <Button
+                  startDecorator={<ExitIcon />}
+                  onClick={handleEndSession}
+                  variant="outlined"
+                  color="danger"
+                  size="sm"
+                >
+                  End Session
+                </Button>
               </Stack>
             </Stack>
           </Stack>
@@ -464,16 +502,66 @@ export default function InterviewChat({
               Get New Question
             </Button>
             <Button
-              startDecorator={<CheckIcon />}
+              startDecorator={isCompletingInterview ? undefined : <CheckIcon />}
               onClick={handleCompleteInterview}
               color="success"
               variant="soft"
+              loading={isCompletingInterview}
+              disabled={isCompletingInterview}
             >
-              Complete This Session
+              {isCompletingInterview ? "Completing..." : "Complete This Session"}
             </Button>
           </Stack>
         )}
       </Box>
+
+      {/* End Session Confirmation Modal */}
+      <Modal
+        open={showEndSessionModal}
+        onClose={() => setShowEndSessionModal(false)}
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          p: 2,
+        }}
+      >
+        <ModalDialog
+          variant="outlined"
+          sx={{
+            maxWidth: 400,
+            width: "90vw",
+          }}
+        >
+          <ModalClose />
+          <Box sx={{ p: 2 }}>
+            <Typography level="h4" sx={{ mb: 2, textAlign: "center" }}>
+              End Interview Session
+            </Typography>
+            <Typography level="body-md" sx={{ mb: 3, textAlign: "center" }}>
+              Are you sure you want to end this interview session? Your current progress might not
+              be saved.
+            </Typography>
+            <Stack direction="row" spacing={2} justifyContent="center">
+              <Button
+                variant="outlined"
+                color="neutral"
+                onClick={() => setShowEndSessionModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="danger"
+                onClick={handleConfirmEndSession}
+                loading={isCompletingInterview}
+                disabled={isCompletingInterview}
+              >
+                {isCompletingInterview ? "Ending..." : "End Session"}
+              </Button>
+            </Stack>
+          </Box>
+        </ModalDialog>
+      </Modal>
     </Box>
   );
 }

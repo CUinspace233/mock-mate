@@ -53,4 +53,4 @@ npm run dev
 
 ## System Architecture (Task Design Document)
 
-See [SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md)
+See [Mock Mate - Interview Simulation System Architecture](https://github.com/CUinspace233/mock-mate/wiki/Mock-Mate-%E2%80%90-Interview-Simulation-System-Architecture)

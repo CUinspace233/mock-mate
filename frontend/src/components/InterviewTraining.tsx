@@ -180,7 +180,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
                   lineHeight: 1.2,
                 }}
               >
-                Mock Mate — Your AI Interview Coach
+                MockMate — Your AI Interview Coach
               </Typography>
               <Typography level="body-sm" color="neutral" sx={{ mt: 0.5 }}>
                 Welcome, {username}! Start your interview training journey

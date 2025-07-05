@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Mock Mate API",
+    title="MockMate API",
     description="Interview practice platform API",
     version="1.0.0",
     lifespan=lifespan,
@@ -51,7 +51,7 @@ app.include_router(trending.router, prefix="/api/trending", tags=["Trending Ques
 
 @app.get("/")
 async def root():
-    return {"message": "Mock Mate API is running"}
+    return {"message": "MockMate API is running"}
 
 
 @app.get("/health")

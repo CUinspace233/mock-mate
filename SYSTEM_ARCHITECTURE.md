@@ -1,8 +1,8 @@
-# Mock Mate - Interview Simulation System Architecture
+# MockMate - Interview Simulation System Architecture
 
 ## Overview
 
-Mock Mate is a comprehensive interview practice platform that simulates real-world technical interviews. The system combines AI-powered question generation, automated answer evaluation, and trending news-based interview questions to provide an up-to-date and realistic interview experience.
+MockMate is a comprehensive interview practice platform that simulates real-world technical interviews. The system combines AI-powered question generation, automated answer evaluation, and trending news-based interview questions to provide an up-to-date and realistic interview experience.
 
 ## System Architecture
 

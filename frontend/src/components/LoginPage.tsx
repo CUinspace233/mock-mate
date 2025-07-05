@@ -88,7 +88,7 @@ export default function LoginPage({ onLoginSuccess, onSwitchToRegister }: LoginP
         <CardContent sx={{ gap: 2 }}>
           <Box sx={{ textAlign: "center", mb: 3 }}>
             <Typography level="h2" component="h1" sx={{ fontSize: "2.5rem" }}>
-              Mock Mate
+              MockMate
             </Typography>
             <Typography level="body-sm" color="neutral">
               Your AI Interview Coach

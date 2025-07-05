@@ -6,7 +6,7 @@
 
 ## Introduction
 
-**Mock Mate** is a comprehensive **interview practice** platform that simulates real-world technical interviews. The system combines AI-powered question generation, automated answer evaluation, and trending news-based interview questions to provide an up-to-date and realistic interview experience.
+**MockMate** is a comprehensive **interview practice** platform that simulates real-world technical interviews. The system combines AI-powered question generation, automated answer evaluation, and trending news-based interview questions to provide an up-to-date and realistic interview experience.
 
 ## Setup
 
@@ -64,6 +64,6 @@ npm run dev
 
 ## System Architecture (Task Design Document)
 
-See [Mock Mate - Interview Simulation System Architecture](https://github.com/CUinspace233/mock-mate/wiki/Mock-Mate-%E2%80%90-Interview-Simulation-System-Architecture)
+See [MockMate - Interview Simulation System Architecture](https://github.com/CUinspace233/mock-mate/wiki/Mock-Mate-%E2%80%90-Interview-Simulation-System-Architecture)
 
 For more fancy documentation, please visit this repo's [DeepWiki](https://deepwiki.com/CUinspace233/mock-mate) !

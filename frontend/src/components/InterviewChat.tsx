@@ -430,7 +430,7 @@ export default function InterviewChat({
                 <Stack direction="row" spacing={2} alignItems="center">
                   <CircularProgress size="sm" />
                   <Typography level="body-sm" color="neutral">
-                    Mock Mate is thinking...
+                    MockMate is thinking...
                   </Typography>
                 </Stack>
               </CardContent>

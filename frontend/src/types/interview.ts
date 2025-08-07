@@ -49,6 +49,7 @@ export interface GenerateQuestionRequest {
   difficulty: Difficulty | null;
   question_type: QuestionType;
   user_id: number;
+  openai_api_key: string;
 }
 
 export interface GenerateQuestionResponse {
@@ -66,6 +67,7 @@ export interface EvaluateAnswerRequest {
   user_id: number;
   answer: string;
   session_id?: string;
+  openai_api_key: string;
 }
 
 export interface EvaluationDetails {

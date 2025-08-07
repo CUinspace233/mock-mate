@@ -59,6 +59,7 @@ interface InterviewChatProps {
   presetQuestion?: NewsQuestion | null;
   onPresetQuestionUsed?: () => void;
   questionType: QuestionType;
+  openaiApiKey: string;
 }
 
 export default function InterviewChat({
@@ -78,6 +79,7 @@ export default function InterviewChat({
   presetQuestion,
   onPresetQuestionUsed,
   questionType,
+  openaiApiKey,
 }: InterviewChatProps) {
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -113,6 +115,7 @@ export default function InterviewChat({
         difficulty: selectedDifficulty,
         question_type: questionType,
         user_id: user_id,
+        openai_api_key: openaiApiKey,
       };
 
       const data = await generateQuestionApi(req);
@@ -144,6 +147,7 @@ export default function InterviewChat({
     setCurrentQuestion,
     setAwaitingAnswer,
     questionType,
+    openaiApiKey,
   ]);
 
   const processPresetQuestion = useCallback(
@@ -207,6 +211,7 @@ export default function InterviewChat({
         question_id: currentQuestion.id,
         user_id: user_id,
         answer: currentAnswer,
+        openai_api_key: openaiApiKey,
       });
 
       const evaluationContent = formatEvaluationContent(evaluationResponse);

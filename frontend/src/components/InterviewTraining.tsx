@@ -15,6 +15,7 @@ import {
   Chip,
   Stack,
   type ColorPaletteProp,
+  Input,
 } from "@mui/joy";
 import {
   Chat as ChatIcon,
@@ -63,6 +64,8 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const setSelectedPosition = useAuthStore((state) => state.setSelectedPosition);
   const sessionId = useAuthStore((state) => state.sessionId);
   const setSessionId = useAuthStore((state) => state.setSessionId);
+  const openaiApiKey = useAuthStore((state) => state.openaiApiKey);
+  const setOpenaiApiKey = useAuthStore((state) => state.setOpenaiApiKey);
 
   const [activeTab, setActiveTab] = useState<number>(0);
   const [interviewStarted, setInterviewStarted] = useState<boolean>(!!sessionId);
@@ -219,7 +222,18 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
           <Stack direction={{ xs: "column", lg: "row" }} spacing={{ xs: 2, lg: 3 }} sx={{ mt: 2 }}>
             {/* Left side spacer or content area for large screens */}
             <Box sx={{ display: { xs: "none", lg: "block" }, flex: 1 }} />
-
+            <Stack direction="column" spacing={1} sx={{ mt: 2, width: { xs: "100%", sm: "auto" } }}>
+              <Typography level="body-md">
+                Set your OpenAI API key to start your interview training
+              </Typography>
+              <Input
+                placeholder="OpenAI API key"
+                value={openaiApiKey}
+                onChange={(e) => setOpenaiApiKey(e.target.value)}
+                type="password"
+                sx={{ maxWidth: 400 }}
+              />
+            </Stack>
             <NewsQuestionPush
               userId={user_id || 0}
               selectedPosition={selectedPosition}
@@ -351,6 +365,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
               presetQuestion={pendingNewsQuestion}
               onPresetQuestionUsed={handleNewsQuestionUsed}
               questionType={selectedQuestionType}
+              openaiApiKey={openaiApiKey}
             />
           </TabPanel>
 

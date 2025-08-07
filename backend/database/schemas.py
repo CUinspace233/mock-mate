@@ -90,6 +90,7 @@ class GenerateQuestionRequest(BaseModel):
     difficulty: Difficulty | None = Difficulty.MEDIUM
     question_type: QuestionType | None = QuestionType.TECHNICAL
     user_id: int
+    openai_api_key: str
 
 
 class GenerateQuestionResponse(BaseModel):
@@ -116,6 +117,7 @@ class EvaluateAnswerRequest(BaseModel):
     user_id: int
     answer: str
     session_id: str | None = None
+    openai_api_key: str
 
 
 class EvaluationDetails(BaseModel):

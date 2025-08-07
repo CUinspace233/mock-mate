@@ -16,13 +16,12 @@ import json
 
 router = APIRouter()
 
-client = OpenAI()
-
 
 async def evaluate_answer_ai(
-    question_content: str, answer: str, expected_keywords: list[str]
+    question_content: str, answer: str, expected_keywords: list[str], openai_api_key: str = ""
 ) -> AnswerEvaluationResult:
     """AI-powered answer evaluation using OpenAI GPT"""
+    client = OpenAI(api_key=openai_api_key)
 
     prompt = f"""
     Evaluate this interview answer based on the question and expected keywords.
@@ -187,9 +186,9 @@ async def evaluate_answer(request: EvaluateAnswerRequest, db: AsyncSession = Dep
             question_content = question.content
             expected_keywords = question.expected_keywords
 
-        # Evaluate the answer using AI
+        # Evaluate the answer using AI with provided API key
         evaluation = await evaluate_answer_ai(
-            question_content or "", request.answer, expected_keywords or []
+            question_content or "", request.answer, expected_keywords or [], request.openai_api_key
         )
 
         answer_evaluation = models.AnswerEvaluation(

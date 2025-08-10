@@ -36,9 +36,6 @@ For `NEWS_FETCH_USER_AGENT` in `.env`, you might not need to change it, but if t
 ```bash
 ./run.sh # The port is 5200 by default, you can change it in the script
 ```
-Note: After the application startup complete, it will start running a task of fetching news for a while.
-
-During the fetching (around 1 min), api requests might be slow.
 
 #### API Documentation
 

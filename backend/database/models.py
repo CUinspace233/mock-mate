@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, String, Boolean, ForeignKey, Text, JSON
+from sqlalchemy import Integer, String, Boolean, ForeignKey, Text, JSON, DateTime
 from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
 from datetime import datetime, UTC
 import uuid
@@ -39,7 +39,9 @@ class Question(Base):
         String(50), nullable=False
     )  # frontend, backend, fullstack, etc.
     difficulty: Mapped[str] = mapped_column(String(20), default="medium")  # easy, medium, hard
-    question_type: Mapped[str] = mapped_column(String(20), default="technical")  # opinion, technical, behavioral
+    question_type: Mapped[str] = mapped_column(
+        String(20), default="technical"
+    )  # opinion, technical, behavioral
     expected_keywords: Mapped[list[str]] = mapped_column(JSON)  # list of expected keywords
     created_at: Mapped[datetime] = mapped_column(default=datetime.now(UTC))
 
@@ -140,8 +142,12 @@ class NewsSource(Base):
         String(50), nullable=False
     )  # "AI", "web_dev", "mobile", etc.
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    last_fetched: Mapped[datetime | None] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.now(UTC))
+    last_fetched: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
 
     # Relationships
     news_items: Mapped[list["NewsItem"]] = relationship("NewsItem", back_populates="source")
@@ -184,9 +190,7 @@ class NewsBasedQuestion(Base):
     question_type: Mapped[str] = mapped_column(
         String(50), default="opinion"
     )  # "opinion", "technical", "behavioral"
-    ai_reasoning: Mapped[str] = mapped_column(
-        Text, nullable=True
-    )
+    ai_reasoning: Mapped[str] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.now(UTC))
 
     # Relationships

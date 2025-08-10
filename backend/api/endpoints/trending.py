@@ -4,7 +4,7 @@ from sqlalchemy import select, and_, desc
 from database import models
 from api.deps import get_db
 from datetime import datetime, UTC, timedelta
-from openai import OpenAI
+from openai import AsyncOpenAI
 import feedparser  # type: ignore
 import logging
 from database.schemas import (
@@ -19,45 +19,45 @@ from database.schemas import (
     GetTrendingQuestionsResponse,
     GeneratedQuestion,
 )
-import requests  # type: ignore
+import httpx
+import asyncio
 from utility.settings import settings
 
 router = APIRouter()
-client = OpenAI()
+client = AsyncOpenAI()
 logger = logging.getLogger(__name__)
 
-# Predefined news sources
 NEWS_SOURCES = {
     NewsCategory.AI: [
         {
-            "name": "Google News - AI Technology",
-            "url": "https://news.google.com/rss/search?q=AI+technology+artificial+intelligence&hl=en",
+            "name": "AI News from Dev.to",
+            "url": "https://dev.to/feed/tag/ai",
             "type": NewsSourceType.RSS,
         },
         {
             "name": "Hacker News - AI",
-            "url": "https://hn.algolia.com/api/v1/search?tags=story&query=AI",
+            "url": "https://hn.algolia.com/api/v1/search?tags=story&query=AI&hitsPerPage=10",
             "type": NewsSourceType.API,
         },
     ],
     NewsCategory.WEB_DEV: [
         {
-            "name": "Google News - Web Development",
-            "url": "https://news.google.com/rss/search?q=web+development+javascript+react+vue&hl=en",
+            "name": "Web Development from Dev.to",
+            "url": "https://dev.to/feed/tag/webdev",
             "type": NewsSourceType.RSS,
         }
     ],
     NewsCategory.MOBILE: [
         {
-            "name": "Google News - Mobile Development",
-            "url": "https://news.google.com/rss/search?q=mobile+development+react+native+flutter&hl=en",
+            "name": "Mobile Development from Dev.to",
+            "url": "https://dev.to/feed/tag/mobile",
             "type": NewsSourceType.RSS,
         }
     ],
     NewsCategory.DEVOPS: [
         {
-            "name": "Google News - DevOps",
-            "url": "https://news.google.com/rss/search?q=devops+docker+kubernetes+cloud&hl=en",
+            "name": "DevOps from Dev.to",
+            "url": "https://dev.to/feed/tag/devops",
             "type": NewsSourceType.RSS,
         }
     ],
@@ -65,17 +65,35 @@ NEWS_SOURCES = {
 
 
 async def fetch_rss_news(url: str, limit: int = 10) -> list[dict]:
-    """Fetch news from RSS feed with User-Agent header"""
+    """Fetch news from RSS feed with proper headers and error handling"""
     try:
         logger.info(f"🔍 Fetching RSS from: {url}")
         headers = {
-            "User-Agent": settings.news_fetch_user_agent
+            "User-Agent": settings.news_fetch_user_agent,
+            "Accept": "application/rss+xml, application/xml, text/xml",
+            "Accept-Language": "en-US,en;q=0.9",
         }
-        resp = requests.get(url, headers=headers, timeout=10)
-        feed = feedparser.parse(resp.content)
+
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as http_client:
+            resp = await http_client.get(url, headers=headers)
+            resp.raise_for_status()  # 检查HTTP状态码
+
+            logger.info(f"📥 HTTP {resp.status_code}: {len(resp.content)} bytes received")
+
+        # feedparser.parse is CPU-bound sync operation, run in thread pool
+        feed = await asyncio.to_thread(feedparser.parse, resp.content)
+
+        # 更详细的调试信息
+        logger.info(f"📊 Feed info - Title: {getattr(feed.feed, 'title', 'Unknown')}")
+        logger.info(f"📊 Feed entries count: {len(feed.entries)}")
+
+        if feed.bozo:
+            logger.warning(f"⚠️ RSS feed has parsing issues: {feed.bozo_exception}")
 
         if not feed.entries:
             logger.warning(f"⚠️ No entries found in RSS feed: {url}")
+            # 打印原始内容的前500字符用于调试
+            logger.debug(f"📄 Raw content preview: {resp.text[:500]}")
             return []
 
         logger.info(f"✅ Found {len(feed.entries)} entries in RSS feed")
@@ -101,8 +119,55 @@ async def fetch_rss_news(url: str, limit: int = 10) -> list[dict]:
             news_items.append(news_item)
 
         return news_items
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            f"❌ HTTP error fetching RSS from {url}: {e.response.status_code} {e.response.text[:200]}"
+        )
+        return []
     except Exception as e:
         logger.error(f"❌ Error fetching RSS news from {url}: {str(e)}")
+        return []
+
+
+async def fetch_hacker_news_api(url: str, limit: int = 10) -> list[dict]:
+    """Fetch news from Hacker News API"""
+    try:
+        logger.info(f"🔍 Fetching from Hacker News API: {url}")
+
+        async with httpx.AsyncClient(timeout=30) as http_client:
+            resp = await http_client.get(url)
+            resp.raise_for_status()
+            data = resp.json()
+
+        news_items = []
+        hits = data.get("hits", [])[:limit]
+
+        logger.info(f"✅ Found {len(hits)} items from Hacker News API")
+
+        for hit in hits:
+            if not hit.get("title") or not hit.get("url"):
+                continue
+
+            # Parse created_at timestamp
+            published_at = datetime.now(UTC)
+            if hit.get("created_at"):
+                published_at = datetime.fromisoformat(hit["created_at"].replace("Z", "+00:00"))
+
+            news_item = {
+                "title": hit["title"],
+                "summary": hit.get("story_text", "")[:1000]
+                or f"Hacker News story with {hit.get('points', 0)} points",
+                "url": hit["url"],
+                "published_at": published_at,
+                "content": hit.get("story_text", "")[:2000],
+            }
+
+            logger.info(f"📰 HN item: {news_item['title'][:50]}...")
+            news_items.append(news_item)
+
+        return news_items
+    except Exception as e:
+        logger.error(f"❌ Error fetching from Hacker News API {url}: {str(e)}")
         return []
 
 
@@ -149,7 +214,8 @@ async def generate_question_from_news(
         REASONING: [your reasoning here]
         """
 
-        response = client.chat.completions.create(
+        # Use async OpenAI client
+        response = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
@@ -199,7 +265,7 @@ async def generate_question_from_news(
 
         if question_content:
             logger.info(f"✅ Generated question: {question_content[:50]}...")
-            logger.info(f"📊 Relevance score: {relevance_score}")
+            logger.info(f"�� Relevance score: {relevance_score}")
         else:
             logger.warning(f"⚠️ Failed to parse question from AI response: {content}")
 
@@ -322,75 +388,74 @@ async def process_news_and_generate_questions(
                     await db.commit()
                     await db.refresh(source)
 
-                # Fetch news items
+                # Fetch news items based on type
+                news_items = []
                 if source_config["type"] == NewsSourceType.RSS:
                     news_items = await fetch_rss_news(source_config["url"], limit)
+                elif source_config["type"] == NewsSourceType.API:
+                    news_items = await fetch_hacker_news_api(source_config["url"], limit)
 
-                    for news_data in news_items:
-                        # Check if news item already exists
-                        existing_stmt = select(models.NewsItem).where(
-                            models.NewsItem.url == news_data["url"]
+                for news_data in news_items:
+                    # Check if news item already exists
+                    existing_stmt = select(models.NewsItem).where(
+                        models.NewsItem.url == news_data["url"]
+                    )
+                    existing_result = await db.execute(existing_stmt)
+                    existing_item = existing_result.scalar_one_or_none()
+
+                    if existing_item:
+                        continue  # Skip if already processed
+
+                    # Create news item
+                    news_item = models.NewsItem(
+                        source_id=source.id,
+                        title=news_data["title"],
+                        summary=news_data["summary"],
+                        content=news_data.get("content", ""),
+                        url=news_data["url"],
+                        published_at=news_data["published_at"],
+                        category=cat.value,
+                        is_processed=False,
+                    )
+                    db.add(news_item)
+                    await db.commit()
+                    await db.refresh(news_item)
+
+                    # Generate questions for different positions
+                    positions = ["frontend", "backend", "fullstack", "mobile", "devops"]
+
+                    for position in positions:
+                        question_data, ai_reasoning, relevance_score = (
+                            await generate_question_from_news(news_data, position, cat)
                         )
-                        existing_result = await db.execute(existing_stmt)
-                        existing_item = existing_result.scalar_one_or_none()
 
-                        if existing_item:
-                            continue  # Skip if already processed
-
-                        # Create news item
-                        news_item = models.NewsItem(
-                            source_id=source.id,
-                            title=news_data["title"],
-                            summary=news_data["summary"],
-                            content=news_data.get("content", ""),
-                            url=news_data["url"],
-                            published_at=news_data["published_at"],
-                            category=cat.value,
-                            is_processed=False,
-                        )
-                        db.add(news_item)
-                        await db.commit()
-                        await db.refresh(news_item)
-
-                        # Generate questions for different positions
-                        positions = ["frontend", "backend", "fullstack", "mobile", "devops"]
-
-                        for position in positions:
-                            question_data, ai_reasoning, relevance_score = (
-                                await generate_question_from_news(news_data, position, cat)
+                        if question_data and relevance_score > 0.3:  # Only save relevant questions
+                            # Create the base question
+                            question = models.Question(
+                                content=question_data.content,
+                                position=question_data.position,
+                                difficulty=question_data.difficulty,
+                                question_type=question_data.question_type.value,
+                                expected_keywords=question_data.expected_keywords,
                             )
+                            db.add(question)
+                            await db.commit()
+                            await db.refresh(question)
 
-                            if (
-                                question_data and relevance_score > 0.3
-                            ):  # Only save relevant questions
-                                # Create the base question
-                                question = models.Question(
-                                    content=question_data.content,
-                                    position=question_data.position,
-                                    difficulty=question_data.difficulty,
-                                    question_type=question_data.question_type.value,
-                                    expected_keywords=question_data.expected_keywords,
-                                )
-                                db.add(question)
-                                await db.commit()
-                                await db.refresh(question)
+                            # Create the news-based question relationship
+                            news_based_question = models.NewsBasedQuestion(
+                                news_item_id=news_item.id,
+                                question_id=question.id,
+                                relevance_score=relevance_score,
+                                question_type=determine_question_type(question_data.content).value,
+                                ai_reasoning=ai_reasoning,
+                            )
+                            db.add(news_based_question)
+                            total_questions += 1
 
-                                # Create the news-based question relationship
-                                news_based_question = models.NewsBasedQuestion(
-                                    news_item_id=news_item.id,
-                                    question_id=question.id,
-                                    relevance_score=relevance_score,
-                                    question_type=determine_question_type(
-                                        question_data.content
-                                    ).value,
-                                    ai_reasoning=ai_reasoning,
-                                )
-                                db.add(news_based_question)
-                                total_questions += 1
-
-                        # Mark news item as processed
-                        news_item.is_processed = True
-                        await db.commit()
+                    # Mark news item as processed
+                    news_item.is_processed = True
+                    await db.commit()
 
                 # Update source last_fetched timestamp
                 source.last_fetched = datetime.now(UTC)

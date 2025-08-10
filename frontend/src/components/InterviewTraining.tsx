@@ -16,12 +16,15 @@ import {
   Stack,
   type ColorPaletteProp,
   Input,
+  CircularProgress,
 } from "@mui/joy";
 import {
   Chat as ChatIcon,
   TrendingUp as TrendingUpIcon,
   History as HistoryIcon,
   Work as WorkIcon,
+  Check as CheckIcon,
+  Cancel as CancelIcon,
 } from "@mui/icons-material";
 import InterviewChat from "./InterviewChat.tsx";
 import InterviewHistory from "./InterviewHistory.tsx";
@@ -33,6 +36,7 @@ import { getDifficultyColor } from "../utils";
 import NewsQuestionPush from "./NewsQuestionPush.tsx";
 import type { NewsQuestion } from "../types/interview.ts";
 import { useAuthStore } from "../stores/useAuthStore.ts";
+import { useDebounceWithImmediate } from "../hooks/useDebounce.ts";
 
 interface InterviewTrainingProps {
   username: string;
@@ -157,6 +161,45 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
     setPendingNewsQuestion(null);
   };
 
+  const [apiKeyStatus, setApiKeyStatus] = useState<"valid" | "invalid" | "checking" | "idle">(
+    "idle",
+  );
+
+  const validateOpenaiApiKey = useDebounceWithImmediate(
+    async (key: string) => {
+      if (!key.trim()) {
+        setApiKeyStatus("idle");
+        return;
+      }
+
+      try {
+        const response = await fetch("https://api.openai.com/v1/models", {
+          headers: { Authorization: `Bearer ${key}` },
+        });
+        setApiKeyStatus(response.ok ? "valid" : "invalid");
+      } catch {
+        setApiKeyStatus("invalid");
+      }
+    },
+    5000,
+    (key: string) => {
+      if (key.trim()) {
+        setApiKeyStatus("checking");
+      } else {
+        setApiKeyStatus("idle");
+      }
+    },
+  );
+
+  useEffect(() => {
+    if (openaiApiKey.trim()) {
+      setApiKeyStatus("checking");
+      validateOpenaiApiKey(openaiApiKey);
+    } else {
+      setApiKeyStatus("idle");
+    }
+  }, [openaiApiKey, validateOpenaiApiKey]);
+
   return (
     <Sheet
       sx={{
@@ -226,13 +269,43 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
               <Typography level="body-md">
                 Set your OpenAI API key to start your interview training
               </Typography>
-              <Input
-                placeholder="OpenAI API key"
-                value={openaiApiKey}
-                onChange={(e) => setOpenaiApiKey(e.target.value)}
-                type="password"
-                sx={{ maxWidth: 400 }}
-              />
+              <Stack spacing={1}>
+                <Input
+                  placeholder="OpenAI API key"
+                  value={openaiApiKey}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setOpenaiApiKey(value);
+                    if (value.trim()) {
+                      setApiKeyStatus("checking");
+                    } else {
+                      setApiKeyStatus("idle");
+                    }
+                    validateOpenaiApiKey(value);
+                  }}
+                  type="password"
+                  sx={{ maxWidth: 400 }}
+                  endDecorator={
+                    apiKeyStatus === "valid" ? (
+                      <CheckIcon color="success" />
+                    ) : apiKeyStatus === "invalid" ? (
+                      <CancelIcon color="error" />
+                    ) : apiKeyStatus === "checking" ? (
+                      <CircularProgress size="sm" />
+                    ) : null
+                  }
+                />
+                {apiKeyStatus === "invalid" && (
+                  <Typography level="body-sm" color="danger">
+                    Invalid API key format
+                  </Typography>
+                )}
+                {apiKeyStatus === "checking" && (
+                  <Typography level="body-sm" color="neutral">
+                    Validating API key...
+                  </Typography>
+                )}
+              </Stack>
             </Stack>
             <NewsQuestionPush
               userId={user_id || 0}

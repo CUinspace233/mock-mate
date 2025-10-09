@@ -42,6 +42,48 @@ export async function generateQuestion(
   return res.data;
 }
 
+export async function generateQuestionStream(
+  request: GenerateQuestionRequest,
+  onDelta: (delta: string) => void,
+): Promise<GenerateQuestionResponse> {
+  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/questions/generate/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    body: JSON.stringify(request),
+  });
+  if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let final: GenerateQuestionResponse | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() || "";
+
+    for (const chunk of parts) {
+      const lines = chunk.split("\n");
+      const eventLine = lines.find((l) => l.startsWith("event: "));
+      const dataLine = lines.find((l) => l.startsWith("data: "));
+      if (!dataLine) continue;
+
+      const payload = JSON.parse(dataLine.slice(6));
+      const evt = eventLine ? eventLine.slice(7) : "message";
+
+      if (evt === "content" && payload.delta) onDelta(payload.delta);
+      if (evt === "final") final = payload as GenerateQuestionResponse;
+    }
+  }
+
+  if (!final) throw new Error("Stream ended without final payload");
+  return final;
+}
+
 export async function evaluateAnswer(
   request: EvaluateAnswerRequest,
 ): Promise<EvaluateAnswerResponse> {

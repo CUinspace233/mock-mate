@@ -27,6 +27,7 @@ import {
 } from "@mui/icons-material";
 import {
   generateQuestion as generateQuestionApi,
+  generateQuestionStream as generateQuestionStreamApi,
   evaluateAnswer as evaluateAnswerApi,
   saveInterviewRecord,
 } from "../api/api";
@@ -118,23 +119,113 @@ export default function InterviewChat({
         openai_api_key: openaiApiKey,
       };
 
-      const data = await generateQuestionApi(req);
+      // Insert a placeholder AI message to stream into
+      const placeholderId = `temp-question-${Date.now()}`;
+      const placeholderMessage: Message = {
+        id: placeholderId,
+        sender: "ai",
+        content: "",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, placeholderMessage]);
+
+      let firstDeltaHandled = false;
+
+      // Try streaming first
+      const finalData = await generateQuestionStreamApi(req, (delta: string) => {
+        if (!firstDeltaHandled) {
+          firstDeltaHandled = true;
+          // Hide spinner once we start receiving content
+          setIsLoading(false);
+        }
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === placeholderId ? { ...m, content: (m.content || "") + delta } : m,
+          ),
+        );
+      });
+
+      // Finalize the streamed message with server-provided id and timestamp
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === placeholderId
+            ? {
+                ...m,
+                id: finalData.question_id,
+                content: finalData.content || m.content,
+                timestamp: new Date(finalData.created_at),
+              }
+            : m,
+        ),
+      );
 
       const questionMessage: Message = {
-        id: data.question_id,
+        id: finalData.question_id,
         sender: "ai",
-        content: data.content || "",
-        timestamp: new Date(data.created_at),
+        content: finalData.content || "",
+        timestamp: new Date(finalData.created_at),
       };
 
-      setMessages((prev) => [...prev, questionMessage]);
       setCurrentQuestion(questionMessage);
       setAwaitingAnswer(true);
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Failed to generate question. Please try again.");
+      // Fallback to non-streaming API
+      try {
+        const req: GenerateQuestionRequest = {
+          position: selectedPosition as PositionKey,
+          difficulty: selectedDifficulty,
+          question_type: questionType,
+          user_id: user_id,
+          openai_api_key: openaiApiKey,
+        };
+
+        const data = await generateQuestionApi(req);
+
+        // Replace the placeholder (if exists) or append new message
+        setMessages((prev) => {
+          const hasPlaceholder = prev.some((m) => m.id.startsWith("temp-question-"));
+          const next = hasPlaceholder
+            ? prev.map((m) =>
+                m.id.startsWith("temp-question-")
+                  ? {
+                      ...m,
+                      id: data.question_id,
+                      content: data.content || "",
+                      timestamp: new Date(data.created_at),
+                    }
+                  : m,
+              )
+            : [
+                ...prev,
+                {
+                  id: data.question_id,
+                  sender: "ai",
+                  content: data.content || "",
+                  timestamp: new Date(data.created_at),
+                } as Message,
+              ];
+          return next;
+        });
+
+        const questionMessage: Message = {
+          id: data.question_id,
+          sender: "ai",
+          content: data.content || "",
+          timestamp: new Date(data.created_at),
+        };
+
+        setCurrentQuestion(questionMessage);
+        setAwaitingAnswer(true);
+      } catch (fallbackErr: unknown) {
+        // Remove placeholder if present
+        setMessages((prev) => prev.filter((m) => !m.id.startsWith("temp-question-")));
+        if (fallbackErr instanceof Error) {
+          setError(fallbackErr.message);
+        } else if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("Failed to generate question. Please try again.");
+        }
       }
     } finally {
       setIsLoading(false);

@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+from typing import Sequence
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, desc
@@ -62,6 +64,19 @@ NEWS_SOURCES = {
         }
     ],
 }
+
+
+DEFAULT_POSITIONS = ["frontend", "backend", "fullstack", "mobile", "devops"]
+
+
+@dataclass
+class GeneratedNewsQuestionResult:
+    """Container for generated questions tied to a specific news item."""
+
+    news_index: int
+    question_data: GeneratedQuestion
+    ai_reasoning: str
+    relevance_score: float
 
 
 async def fetch_rss_news(url: str, limit: int = 10) -> list[dict]:
@@ -361,111 +376,212 @@ async def process_news_and_generate_questions(
     try:
         categories_to_process = [category] if category else list(NewsCategory)
         total_questions = 0
-
         for cat in categories_to_process:
             sources = NEWS_SOURCES.get(cat, [])
-
             for source_config in sources:
-                # Check if news source exists, create if not
-                source_stmt = select(models.NewsSource).where(
-                    and_(
-                        models.NewsSource.url == source_config["url"],
-                        models.NewsSource.category == cat.value,
-                    )
+                total_questions += await _process_source_config(
+                    db=db,
+                    category=cat,
+                    source_config=source_config,
+                    limit=limit,
+                    positions=DEFAULT_POSITIONS,
                 )
-                source_result = await db.execute(source_stmt)
-                source = source_result.scalar_one_or_none()
-
-                if not source:
-                    source = models.NewsSource(
-                        name=source_config["name"],
-                        source_type=source_config["type"],
-                        url=source_config["url"],
-                        category=cat.value,
-                        is_active=True,
-                    )
-                    db.add(source)
-                    await db.commit()
-                    await db.refresh(source)
-
-                # Fetch news items based on type
-                news_items = []
-                if source_config["type"] == NewsSourceType.RSS:
-                    news_items = await fetch_rss_news(source_config["url"], limit)
-                elif source_config["type"] == NewsSourceType.API:
-                    news_items = await fetch_hacker_news_api(source_config["url"], limit)
-
-                for news_data in news_items:
-                    # Check if news item already exists
-                    existing_stmt = select(models.NewsItem).where(
-                        models.NewsItem.url == news_data["url"]
-                    )
-                    existing_result = await db.execute(existing_stmt)
-                    existing_item = existing_result.scalar_one_or_none()
-
-                    if existing_item:
-                        continue  # Skip if already processed
-
-                    # Create news item
-                    news_item = models.NewsItem(
-                        source_id=source.id,
-                        title=news_data["title"],
-                        summary=news_data["summary"],
-                        content=news_data.get("content", ""),
-                        url=news_data["url"],
-                        published_at=news_data["published_at"],
-                        category=cat.value,
-                        is_processed=False,
-                    )
-                    db.add(news_item)
-                    await db.commit()
-                    await db.refresh(news_item)
-
-                    # Generate questions for different positions
-                    positions = ["frontend", "backend", "fullstack", "mobile", "devops"]
-
-                    for position in positions:
-                        question_data, ai_reasoning, relevance_score = (
-                            await generate_question_from_news(news_data, position, cat)
-                        )
-
-                        if question_data and relevance_score > 0.3:  # Only save relevant questions
-                            # Create the base question
-                            question = models.Question(
-                                content=question_data.content,
-                                position=question_data.position,
-                                difficulty=question_data.difficulty,
-                                question_type=question_data.question_type.value,
-                                expected_keywords=question_data.expected_keywords,
-                            )
-                            db.add(question)
-                            await db.commit()
-                            await db.refresh(question)
-
-                            # Create the news-based question relationship
-                            news_based_question = models.NewsBasedQuestion(
-                                news_item_id=news_item.id,
-                                question_id=question.id,
-                                relevance_score=relevance_score,
-                                question_type=determine_question_type(question_data.content).value,
-                                ai_reasoning=ai_reasoning,
-                            )
-                            db.add(news_based_question)
-                            total_questions += 1
-
-                    # Mark news item as processed
-                    news_item.is_processed = True
-                    await db.commit()
-
-                # Update source last_fetched timestamp
-                source.last_fetched = datetime.now(UTC)
-                await db.commit()
 
         logger.info(f"Generated {total_questions} questions from latest news")
 
     except Exception as e:
         logger.error(f"Error in background news processing: {str(e)}")
         await db.rollback()
+
+
+async def _process_source_config(
+    db: AsyncSession,
+    category: NewsCategory,
+    source_config: dict,
+    limit: int,
+    positions: Sequence[str],
+) -> int:
+    """Process a single source configuration and persist generated questions."""
+    source = await _get_or_create_source(db, category, source_config)
+
+    news_items = await _fetch_news_for_source(source_config, limit)
+    if not news_items:
+        source.last_fetched = datetime.now(UTC)
+        await db.commit()
+        return 0
+
+    fresh_news_items = await _filter_new_news_items(db, news_items)
+    if not fresh_news_items:
+        source.last_fetched = datetime.now(UTC)
+        await db.commit()
+        return 0
+
+    news_models = [_build_news_model(source, news_data, category) for news_data in fresh_news_items]
+    db.add_all(news_models)
+    await db.flush()
+
+    generated_results = await _generate_questions_for_news_items(
+        fresh_news_items, positions, category
+    )
+
+    pending_relations: list[
+        tuple[models.Question, models.NewsItem, GeneratedNewsQuestionResult]
+    ] = []
+    if generated_results:
+        for result in generated_results:
+            question_model = models.Question(
+                content=result.question_data.content,
+                position=result.question_data.position,
+                difficulty=result.question_data.difficulty,
+                question_type=result.question_data.question_type.value,
+                expected_keywords=result.question_data.expected_keywords,
+            )
+            db.add(question_model)
+            pending_relations.append((question_model, news_models[result.news_index], result))
+
+        await db.flush()
+
+        news_based_models = [
+            models.NewsBasedQuestion(
+                news_item_id=news_model.id,
+                question_id=question_model.id,
+                relevance_score=result.relevance_score,
+                question_type=result.question_data.question_type.value,
+                ai_reasoning=result.ai_reasoning,
+            )
+            for question_model, news_model, result in pending_relations
+        ]
+        db.add_all(news_based_models)
+        created_questions = len(news_based_models)
+    else:
+        created_questions = 0
+
+    for news_item in news_models:
+        news_item.is_processed = True
+
+    source.last_fetched = datetime.now(UTC)
+    await db.commit()
+
+    return created_questions
+
+
+async def _get_or_create_source(
+    db: AsyncSession, category: NewsCategory, source_config: dict
+) -> models.NewsSource:
+    """Fetch existing source or create a new one if needed."""
+    source_stmt = select(models.NewsSource).where(
+        and_(
+            models.NewsSource.url == source_config["url"],
+            models.NewsSource.category == category.value,
+        )
+    )
+    source_result = await db.execute(source_stmt)
+    source = source_result.scalar_one_or_none()
+
+    if source:
+        return source
+
+    source = models.NewsSource(
+        name=source_config["name"],
+        source_type=source_config["type"],
+        url=source_config["url"],
+        category=category.value,
+        is_active=True,
+    )
+    db.add(source)
+    await db.flush()
+    return source
+
+
+async def _fetch_news_for_source(source_config: dict, limit: int) -> list[dict]:
+    """Fetch news items for the given source configuration."""
+    if source_config["type"] == NewsSourceType.RSS:
+        return await fetch_rss_news(source_config["url"], limit)
+    if source_config["type"] == NewsSourceType.API:
+        return await fetch_hacker_news_api(source_config["url"], limit)
+
+    logger.warning(f"Unsupported news source type: {source_config['type']}")
+    return []
+
+
+async def _filter_new_news_items(db: AsyncSession, news_items: list[dict]) -> list[dict]:
+    """Filter out news items that already exist in the database."""
+    unique_items: list[dict] = []
+    seen_urls: set[str] = set()
+
+    for item in news_items:
+        url = item.get("url")
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        unique_items.append(item)
+
+    if not unique_items:
+        return []
+
+    urls = [item["url"] for item in unique_items]
+    existing_stmt = select(models.NewsItem.url).where(models.NewsItem.url.in_(urls))
+    existing_result = await db.execute(existing_stmt)
+    existing_urls = {row[0] for row in existing_result.all()}
+
+    return [item for item in unique_items if item["url"] not in existing_urls]
+
+
+def _build_news_model(
+    source: models.NewsSource, news_data: dict, category: NewsCategory
+) -> models.NewsItem:
+    """Create a NewsItem ORM instance from fetched data."""
+    return models.NewsItem(
+        source_id=source.id,
+        title=news_data.get("title", ""),
+        summary=news_data.get("summary", ""),
+        content=news_data.get("content", ""),
+        url=news_data["url"],
+        published_at=news_data.get("published_at", datetime.now(UTC)),
+        category=category.value,
+        is_processed=False,
+    )
+
+
+async def _generate_questions_for_news_items(
+    news_items: list[dict],
+    positions: Sequence[str],
+    category: NewsCategory,
+) -> list[GeneratedNewsQuestionResult]:
+    """Generate questions for all news items and return valid results."""
+    if not news_items:
+        return []
+
+    task_contexts = [
+        (index, position) for index in range(len(news_items)) for position in positions
+    ]
+    if not task_contexts:
+        return []
+
+    tasks = [
+        generate_question_from_news(news_items[index], position, category)
+        for index, position in task_contexts
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    valid_results: list[GeneratedNewsQuestionResult] = []
+    for (index, _), result in zip(task_contexts, results):
+        if isinstance(result, BaseException):
+            logger.error(f"Failed to generate question for news index {index}: {result}")
+            continue
+
+        question_data, ai_reasoning, relevance_score = result
+        if question_data and relevance_score > 0.3:
+            valid_results.append(
+                GeneratedNewsQuestionResult(
+                    news_index=index,
+                    question_data=question_data,
+                    ai_reasoning=ai_reasoning,
+                    relevance_score=relevance_score,
+                )
+            )
+
+    return valid_results
 
 
 @router.get("/trending-questions", response_model=GetTrendingQuestionsResponse)

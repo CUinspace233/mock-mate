@@ -40,7 +40,7 @@ async def generate_ai_question(
     )
 
     response = client.chat.completions.create(
-        model="gpt-4.1-mini",
+        model="gpt-4.1-nano",
         messages=[
             {"role": "system", "content": "You are an expert interview question generator."},
             {"role": "user", "content": prompt},
@@ -71,7 +71,7 @@ async def generate_question_stream(req: GenerateQuestionRequest, db: AsyncSessio
     prompt = f"Generate a {req.difficulty} level {req.question_type} interview question for a {req.position} position Return only the question."
 
     stream = client.chat.completions.create(
-        model="gpt-4.1-mini",
+        model="gpt-4.1-nano",
         messages=[
             {"role": "system", "content": "You are an expert interview question generator."},
             {"role": "user", "content": prompt},

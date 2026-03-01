@@ -75,7 +75,7 @@ async def evaluate_answer_ai(
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4.1-mini",
+            model="gpt-4.1-nano",
             messages=[
                 {
                     "role": "system",

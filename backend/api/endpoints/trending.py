@@ -231,7 +231,7 @@ async def generate_question_from_news(
         # Use async OpenAI client
         client = AsyncOpenAI(api_key=openai_api_key) if openai_api_key else AsyncOpenAI()
         response = await client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4.1-nano",
             messages=[
                 {
                     "role": "system",

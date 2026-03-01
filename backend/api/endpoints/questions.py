@@ -22,13 +22,18 @@ from database.schemas import (
 
 router = APIRouter()
 
-client = OpenAI()
+
+def _get_client(api_key: str = "") -> OpenAI:
+    """Create OpenAI client using provided key, fallback to env var."""
+    return OpenAI(api_key=api_key) if api_key else OpenAI()
 
 
 async def generate_ai_question(
-    position: str, difficulty: str, question_type: QuestionType | None = QuestionType.TECHNICAL
+    position: str, difficulty: str, question_type: QuestionType | None = QuestionType.TECHNICAL,
+    openai_api_key: str = "",
 ) -> GeneratedQuestion:
     """Generate a question using AI (OpenAI GPT)"""
+    client = _get_client(openai_api_key)
     prompt = (
         f"Generate a {difficulty} level {question_type} interview question for a {position} position"
         + " Return only the question."
@@ -62,6 +67,7 @@ async def generate_ai_question(
 
 @router.post("/generate/stream")
 async def generate_question_stream(req: GenerateQuestionRequest, db: AsyncSession = Depends(get_db)):
+    client = _get_client(req.openai_api_key)
     prompt = f"Generate a {req.difficulty} level {req.question_type} interview question for a {req.position} position Return only the question."
 
     stream = client.chat.completions.create(
@@ -122,6 +128,7 @@ async def generate_question(
             request.position.value,
             request.difficulty.value if request.difficulty else "medium",
             request.question_type,
+            request.openai_api_key,
         )
 
         question = models.Question(

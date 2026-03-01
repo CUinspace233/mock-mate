@@ -1,10 +1,11 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore
 from apscheduler.triggers.interval import IntervalTrigger  # type: ignore
 from api.deps import get_db
-from api.endpoints.trending import process_news_and_generate_questions
+from api.endpoints.trending import process_news_and_generate_questions, cleanup_old_news
 from datetime import datetime, UTC, timedelta
 from database import models
 from sqlalchemy import select, desc
+from utility.settings import settings
 
 
 async def fetch_news_task():
@@ -42,6 +43,19 @@ async def fetch_news_task():
             await db.close()
 
 
+async def cleanup_news_task():
+    """Periodically clean up expired news data and reclaim database space"""
+    async for db in get_db():
+        try:
+            print(f"🧹 Starting news cleanup task (retention={settings.news_retention_days} days)...")
+            await cleanup_old_news(db, settings.news_retention_days)
+            print("✅ News cleanup task completed")
+        except Exception as e:
+            print(f"❌ News cleanup task failed: {e}")
+        finally:
+            await db.close()
+
+
 def start_scheduler():
     scheduler = AsyncIOScheduler(
         job_defaults={
@@ -58,5 +72,13 @@ def start_scheduler():
         id="news_fetch_job",
         next_run_time=datetime.now(UTC),  # Run immediately on startup
     )
+
+    # Schedule cleanup to run every 24 hours
+    scheduler.add_job(
+        cleanup_news_task,
+        trigger=IntervalTrigger(hours=24),
+        id="news_cleanup_job",
+    )
+
     scheduler.start()
     return scheduler

@@ -150,7 +150,9 @@ class NewsSource(Base):
     )
 
     # Relationships
-    news_items: Mapped[list["NewsItem"]] = relationship("NewsItem", back_populates="source")
+    news_items: Mapped[list["NewsItem"]] = relationship(
+        "NewsItem", back_populates="source", cascade="all, delete-orphan"
+    )
 
 
 class NewsItem(Base):
@@ -174,7 +176,7 @@ class NewsItem(Base):
     # Relationships
     source: Mapped["NewsSource"] = relationship("NewsSource", back_populates="news_items")
     generated_questions: Mapped[list["NewsBasedQuestion"]] = relationship(
-        "NewsBasedQuestion", back_populates="news_item"
+        "NewsBasedQuestion", back_populates="news_item", cascade="all, delete-orphan"
     )
 
 

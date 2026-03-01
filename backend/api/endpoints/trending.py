@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Sequence
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, desc
+from sqlalchemy import select, and_, desc, delete, text
 from database import models
 from api.deps import get_db
 from datetime import datetime, UTC, timedelta
@@ -681,3 +681,69 @@ async def scheduled_news_fetch(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to start scheduled fetch: {str(e)}",
         )
+
+
+async def cleanup_old_news(db: AsyncSession, retention_days: int) -> None:
+    """Delete news data older than retention_days and VACUUM the database."""
+    cutoff_date = datetime.now(UTC) - timedelta(days=retention_days)
+
+    # 1. Find expired NewsBasedQuestion IDs and their linked question_ids
+    expired_nbq_stmt = (
+        select(models.NewsBasedQuestion.id, models.NewsBasedQuestion.question_id)
+        .join(models.NewsItem, models.NewsBasedQuestion.news_item_id == models.NewsItem.id)
+        .where(models.NewsItem.published_at < cutoff_date)
+    )
+    expired_nbq_result = await db.execute(expired_nbq_stmt)
+    expired_rows = expired_nbq_result.all()
+
+    expired_nbq_ids = [row[0] for row in expired_rows]
+    expired_question_ids = [row[1] for row in expired_rows]
+
+    # 2. Delete expired NewsBasedQuestion records
+    deleted_nbq = 0
+    if expired_nbq_ids:
+        result = await db.execute(
+            delete(models.NewsBasedQuestion).where(
+                models.NewsBasedQuestion.id.in_(expired_nbq_ids)
+            )
+        )
+        deleted_nbq = result.rowcount  # type: ignore[assignment]
+
+    # 3. Delete associated Question records (only news-generated ones, skip those
+    #    referenced by InterviewRecord to avoid breaking user history)
+    deleted_questions = 0
+    if expired_question_ids:
+        # Exclude questions that are referenced by interview records
+        used_q_stmt = select(models.InterviewRecord.question_id).where(
+            models.InterviewRecord.question_id.in_(expired_question_ids)
+        )
+        used_q_result = await db.execute(used_q_stmt)
+        used_question_ids = {row[0] for row in used_q_result.all()}
+
+        safe_to_delete = [qid for qid in expired_question_ids if qid not in used_question_ids]
+        if safe_to_delete:
+            result = await db.execute(
+                delete(models.Question).where(models.Question.id.in_(safe_to_delete))
+            )
+            deleted_questions = result.rowcount  # type: ignore[assignment]
+
+    # 4. Delete expired NewsItem records
+    result = await db.execute(
+        delete(models.NewsItem).where(models.NewsItem.published_at < cutoff_date)
+    )
+    deleted_news = result.rowcount  # type: ignore[assignment]
+
+    await db.commit()
+
+    # 5. VACUUM to reclaim disk space (must run outside a transaction)
+    from database.session import engine
+
+    async with engine.connect() as conn:
+        await conn.execution_options(isolation_level="AUTOCOMMIT")
+        await conn.execute(text("VACUUM"))
+
+    logger.info(
+        f"Cleanup complete: deleted {deleted_news} news items, "
+        f"{deleted_nbq} news-based questions, {deleted_questions} questions "
+        f"(retention={retention_days} days)"
+    )

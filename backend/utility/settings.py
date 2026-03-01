@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     branch: str | None = None
     commit_id: str | None = None
 
+    news_retention_days: int = 30
+
     database_url: str = "sqlite+aiosqlite:///./database/mockmate.db"
     database_echo: bool = True
 

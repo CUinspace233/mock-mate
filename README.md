@@ -59,6 +59,35 @@ The port is `1314` by default, you can change it in `vite.config.ts`
 npm run dev
 ```
 
+## Database Maintenance
+
+The system automatically fetches news and generates interview questions on a schedule. Over time this data accumulates. A scheduled task runs every 24 hours to clean up expired data (default retention: 30 days). You can also run the cleanup manually:
+
+```bash
+cd backend
+
+# Preview what would be deleted (no changes made)
+python cleanup_news.py --dry-run
+
+# Clean up with default 30-day retention
+python cleanup_news.py
+
+# Custom retention period
+python cleanup_news.py --days 7
+```
+
+To change the default retention period, set the `NEWS_RETENTION_DAYS` environment variable in your `.env` file:
+
+```env
+NEWS_RETENTION_DAYS=14
+```
+
+The cleanup process:
+1. Deletes expired `NewsBasedQuestion` and associated `Question` records
+2. Skips questions that have been used in user interview sessions
+3. Deletes expired `NewsItem` records
+4. Runs SQLite `VACUUM` to reclaim disk space
+
 ## System Architecture (Task Design Document)
 
 See [MockMate - Interview Simulation System Architecture](https://github.com/CUinspace233/mock-mate/wiki/Mock-Mate-%E2%80%90-Interview-Simulation-System-Architecture)

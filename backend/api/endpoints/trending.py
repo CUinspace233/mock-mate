@@ -26,7 +26,6 @@ import asyncio
 from utility.settings import settings
 
 router = APIRouter()
-client = AsyncOpenAI()
 logger = logging.getLogger(__name__)
 
 NEWS_SOURCES = {
@@ -187,7 +186,7 @@ async def fetch_hacker_news_api(url: str, limit: int = 10) -> list[dict]:
 
 
 async def generate_question_from_news(
-    news_item: dict, position: str, category: NewsCategory
+    news_item: dict, position: str, category: NewsCategory, openai_api_key: str = ""
 ) -> tuple[GeneratedQuestion | None, str, float]:
     """Generate interview question from news item using AI"""
     try:
@@ -230,6 +229,7 @@ async def generate_question_from_news(
         """
 
         # Use async OpenAI client
+        client = AsyncOpenAI(api_key=openai_api_key) if openai_api_key else AsyncOpenAI()
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -353,7 +353,7 @@ async def fetch_latest_news(
     try:
         # Add background task for news processing
         background_tasks.add_task(
-            process_news_and_generate_questions, db, request.category, request.limit
+            process_news_and_generate_questions, db, request.category, request.limit, request.openai_api_key
         )
 
         return FetchNewsResponse(
@@ -370,7 +370,7 @@ async def fetch_latest_news(
 
 
 async def process_news_and_generate_questions(
-    db: AsyncSession, category: NewsCategory | None = None, limit: int = 10
+    db: AsyncSession, category: NewsCategory | None = None, limit: int = 10, openai_api_key: str = ""
 ):
     """Background task to process news and generate questions"""
     try:
@@ -385,6 +385,7 @@ async def process_news_and_generate_questions(
                     source_config=source_config,
                     limit=limit,
                     positions=DEFAULT_POSITIONS,
+                    openai_api_key=openai_api_key,
                 )
 
         logger.info(f"Generated {total_questions} questions from latest news")
@@ -400,6 +401,7 @@ async def _process_source_config(
     source_config: dict,
     limit: int,
     positions: Sequence[str],
+    openai_api_key: str = "",
 ) -> int:
     """Process a single source configuration and persist generated questions."""
     source = await _get_or_create_source(db, category, source_config)
@@ -421,7 +423,7 @@ async def _process_source_config(
     await db.flush()
 
     generated_results = await _generate_questions_for_news_items(
-        fresh_news_items, positions, category
+        fresh_news_items, positions, category, openai_api_key
     )
 
     pending_relations: list[
@@ -547,6 +549,7 @@ async def _generate_questions_for_news_items(
     news_items: list[dict],
     positions: Sequence[str],
     category: NewsCategory,
+    openai_api_key: str = "",
 ) -> list[GeneratedNewsQuestionResult]:
     """Generate questions for all news items and return valid results."""
     if not news_items:
@@ -559,7 +562,7 @@ async def _generate_questions_for_news_items(
         return []
 
     tasks = [
-        generate_question_from_news(news_items[index], position, category)
+        generate_question_from_news(news_items[index], position, category, openai_api_key)
         for index, position in task_contexts
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)

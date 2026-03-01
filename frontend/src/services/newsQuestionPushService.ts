@@ -1,4 +1,4 @@
-import { getTrendingQuestions, getUserPreferences } from "../api/api";
+import { getTrendingQuestions, getUserPreferences, fetchNewsManual } from "../api/api";
 import type { NewsQuestion, UserPreferences, PushHistory } from "../types/interview";
 import { useNewsQuestionPushStore } from "../stores/useNewsQuestionPushStore";
 import { useAuthStore } from "../stores/useAuthStore";
@@ -70,6 +70,12 @@ export class NewsQuestionPushService {
       // Check if user is currently in interview (skip pushing during active sessions)
       if (this.isUserInInterview()) {
         return;
+      }
+
+      // Trigger news fetch + question generation with user's API key
+      const openaiApiKey = useAuthStore.getState().openaiApiKey;
+      if (openaiApiKey.trim()) {
+        await fetchNewsManual(openaiApiKey);
       }
 
       // Fetch trending questions

@@ -321,6 +321,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
                 }
               }}
               isInterviewActive={interviewStarted}
+              openaiApiKey={openaiApiKey}
             />
           </Stack>
         </CardContent>

@@ -170,6 +170,12 @@ export async function getTrendingQuestions(params?: {
   return res.data;
 }
 
+export async function fetchNewsManual(openaiApiKey: string): Promise<void> {
+  await axios.post(`${import.meta.env.VITE_API_URL}/api/trending/fetch-news`, {
+    openai_api_key: openaiApiKey,
+  });
+}
+
 export async function getUserPreferences(userId: number): Promise<UserPreferences> {
   const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/users/${userId}/preferences`);
   return res.data;

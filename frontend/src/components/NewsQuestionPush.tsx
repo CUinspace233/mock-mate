@@ -3,7 +3,7 @@ import { Modal, ModalDialog, ModalClose, Box, Typography, Alert, Stack, Button }
 import { Newspaper } from "@mui/icons-material";
 import NewsQuestionCard from "./NewsQuestionCard";
 import { NewsQuestionPushService } from "../services/newsQuestionPushService";
-import { getTrendingQuestions } from "../api/api";
+import { getTrendingQuestions, fetchNewsManual } from "../api/api";
 import type { NewsQuestion } from "../types/interview";
 
 interface NewsQuestionPushProps {
@@ -11,6 +11,7 @@ interface NewsQuestionPushProps {
   selectedPosition: string;
   onStartAnswering: (questionId: string, newsQuestion: NewsQuestion) => void;
   isInterviewActive: boolean;
+  openaiApiKey: string;
 }
 
 export default function NewsQuestionPush({
@@ -18,6 +19,7 @@ export default function NewsQuestionPush({
   selectedPosition,
   onStartAnswering,
   isInterviewActive,
+  openaiApiKey,
 }: NewsQuestionPushProps) {
   const [currentQuestion, setCurrentQuestion] = useState<NewsQuestion | null>(null);
   const [showPushModal, setShowPushModal] = useState(false);
@@ -99,10 +101,18 @@ export default function NewsQuestionPush({
   };
 
   const handleManualFetch = async () => {
+    if (!openaiApiKey.trim()) {
+      setError("Please set your OpenAI API Key first to use Daily Trending Question");
+      return;
+    }
+
     setIsLoadingManual(true);
     setError("");
 
     try {
+      // Trigger news fetch + question generation with user's API key
+      await fetchNewsManual(openaiApiKey);
+
       const response = await getTrendingQuestions({
         position: selectedPosition,
         limit: 1,

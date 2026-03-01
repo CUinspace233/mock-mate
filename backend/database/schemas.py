@@ -412,6 +412,7 @@ class TrendingQuestionResponse(BaseModel):
 class FetchNewsRequest(BaseModel):
     category: NewsCategory | None = None
     limit: int = 10
+    openai_api_key: str = ""
 
 
 class FetchNewsResponse(BaseModel):

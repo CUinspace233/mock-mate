@@ -6,6 +6,7 @@ from database import models
 from api.deps import get_db
 from datetime import datetime, UTC
 from openai import OpenAI
+from openai.types.shared_params import ResponseFormatJSONSchema
 from database.schemas import (
     EvaluateAnswerRequest,
     EvaluateAnswerResponse,
@@ -17,34 +18,59 @@ import json
 router = APIRouter()
 
 
+EVALUATION_SCHEMA: ResponseFormatJSONSchema = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "answer_evaluation",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "score": {"type": "integer"},
+                "feedback": {"type": "string"},
+                "strengths": {"type": "array", "items": {"type": "string"}},
+                "improvements": {"type": "array", "items": {"type": "string"}},
+                "keywords_covered": {"type": "array", "items": {"type": "string"}},
+                "keywords_missed": {"type": "array", "items": {"type": "string"}},
+                "technical_accuracy": {"type": "number"},
+                "communication_clarity": {"type": "number"},
+                "completeness": {"type": "number"},
+                "practical_experience": {"type": "number"},
+            },
+            "required": [
+                "score",
+                "feedback",
+                "strengths",
+                "improvements",
+                "keywords_covered",
+                "keywords_missed",
+                "technical_accuracy",
+                "communication_clarity",
+                "completeness",
+                "practical_experience",
+            ],
+            "additionalProperties": False,
+        },
+    },
+}
+
+
 async def evaluate_answer_ai(
     question_content: str, answer: str, expected_keywords: list[str], openai_api_key: str = ""
 ) -> AnswerEvaluationResult:
-    """AI-powered answer evaluation using OpenAI GPT"""
+    """AI-powered answer evaluation using OpenAI GPT with structured output"""
     client = OpenAI(api_key=openai_api_key)
 
     prompt = f"""
     Evaluate this interview answer based on the question and expected keywords.
-    
+
     Question: {question_content}
     Expected Keywords: {', '.join(expected_keywords)}
     Answer: {answer}
-    
-    Provide evaluation in this exact JSON format:
-    {{
-        "score": <integer 0-100>,
-        "feedback": "<detailed feedback string>",
-        "strengths": ["<strength1>", "<strength2>", "<strength3>"],
-        "improvements": ["<improvement1>", "<improvement2>", "<improvement3>"],
-        "keywords_covered": ["<covered_keyword1>", "<covered_keyword2>"],
-        "keywords_missed": ["<missed_keyword1>", "<missed_keyword2>"],
-        "technical_accuracy": <float 0-100>,
-        "communication_clarity": <float 0-100>,
-        "completeness": <float 0-100>,
-        "practical_experience": <float 0-100>
-    }}
-    
+
     Score based on: technical accuracy (40%), communication clarity (30%), completeness (20%), practical experience (10%).
+    All sub-scores (technical_accuracy, communication_clarity, completeness, practical_experience) should be 0-100.
+    The overall score should also be 0-100.
     """
 
     try:
@@ -53,42 +79,35 @@ async def evaluate_answer_ai(
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert technical interviewer. Evaluate answers objectively and provide constructive feedback. Always respond with valid JSON only.",
+                    "content": "You are an expert technical interviewer. Evaluate answers objectively and provide constructive feedback.",
                 },
                 {"role": "user", "content": prompt},
             ],
             max_tokens=800,
             temperature=0.3,
+            response_format=EVALUATION_SCHEMA,
         )
 
-        evaluation_text = (response.choices[0].message.content or "").strip()
+        evaluation = json.loads(response.choices[0].message.content or "{}")
 
-        # Parse the JSON response
-        evaluation = json.loads(evaluation_text)
-
-        # Create evaluation details object
         evaluation_details = EvaluationDetails(
-            technical_accuracy=min(max(float(evaluation.get("technical_accuracy", 0)), 0), 100),
-            communication_clarity=min(
-                max(float(evaluation.get("communication_clarity", 0)), 0), 100
-            ),
-            completeness=min(max(float(evaluation.get("completeness", 0)), 0), 100),
-            practical_experience=min(max(float(evaluation.get("practical_experience", 0)), 0), 100),
+            technical_accuracy=min(max(float(evaluation["technical_accuracy"]), 0), 100),
+            communication_clarity=min(max(float(evaluation["communication_clarity"]), 0), 100),
+            completeness=min(max(float(evaluation["completeness"]), 0), 100),
+            practical_experience=min(max(float(evaluation["practical_experience"]), 0), 100),
         )
 
-        # Return typed result
         return AnswerEvaluationResult(
-            score=min(max(int(evaluation.get("score", 0)), 0), 100),
-            feedback=evaluation.get("feedback", "No feedback provided"),
-            strengths=evaluation.get("strengths", ["Answer provided"]),
-            improvements=evaluation.get("improvements", ["Could be more detailed"]),
-            keywords_covered=evaluation.get("keywords_covered", []),
-            keywords_missed=evaluation.get("keywords_missed", expected_keywords),
+            score=min(max(int(evaluation["score"]), 0), 100),
+            feedback=evaluation["feedback"],
+            strengths=evaluation["strengths"],
+            improvements=evaluation["improvements"],
+            keywords_covered=evaluation["keywords_covered"],
+            keywords_missed=evaluation["keywords_missed"],
             evaluation_details=evaluation_details,
         )
 
-    except (json.JSONDecodeError, KeyError, ValueError) as e:
-        # Fallback to mock evaluation if AI fails
+    except Exception as e:
         print(f"AI evaluation failed: {e}, falling back to mock evaluation")
         return evaluate_answer_mock(question_content, answer, expected_keywords)
 

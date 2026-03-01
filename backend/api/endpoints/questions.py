@@ -7,7 +7,6 @@ from datetime import datetime, UTC
 from openai import OpenAI
 from fastapi.responses import StreamingResponse
 import json
-import uuid
 from datetime import timezone
 from database.schemas import (
     GeneratedQuestion,
@@ -62,7 +61,7 @@ async def generate_ai_question(
     )
 
 @router.post("/generate/stream")
-def generate_question_stream(req: GenerateQuestionRequest):
+async def generate_question_stream(req: GenerateQuestionRequest, db: AsyncSession = Depends(get_db)):
     prompt = f"Generate a {req.difficulty} level {req.question_type} interview question for a {req.position} position Return only the question."
 
     stream = client.chat.completions.create(
@@ -78,7 +77,7 @@ def generate_question_stream(req: GenerateQuestionRequest):
         stream=True,
     )
 
-    def sse_iter():
+    async def sse_iter():
         content = ""
         for chunk in stream:
             delta = (chunk.choices[0].delta.content or "")
@@ -87,14 +86,26 @@ def generate_question_stream(req: GenerateQuestionRequest):
             content += delta
             yield f"event: content\ndata: {json.dumps({'delta': delta})}\n\n"
 
+        # Save question to database so /answers/evaluate can find it
+        question = models.Question(
+            content=content.strip(),
+            position=req.position,
+            difficulty=req.difficulty or "easy",
+            question_type=req.question_type,
+            expected_keywords=["technical", "explanation", "examples"],
+        )
+        db.add(question)
+        await db.commit()
+        await db.refresh(question)
+
         final = {
-            "question_id": str(uuid.uuid4()),
+            "question_id": str(question.id),
             "content": content.strip(),
             "position": req.position,
             "difficulty": req.difficulty or "easy",
             "question_type": req.question_type,
             "expected_keywords": ["technical", "explanation", "examples"],
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": (question.created_at or datetime.now(timezone.utc)).isoformat(),
         }
         yield f"event: final\ndata: {json.dumps(final)}\n\n"
         yield "event: end\ndata: {}\n\n"

@@ -59,7 +59,7 @@ async def evaluate_answer_ai(
     question_content: str, answer: str, expected_keywords: list[str], openai_api_key: str = ""
 ) -> AnswerEvaluationResult:
     """AI-powered answer evaluation using OpenAI GPT with structured output"""
-    client = OpenAI(api_key=openai_api_key)
+    client = OpenAI(api_key=openai_api_key) if openai_api_key else OpenAI()
 
     prompt = f"""
     Evaluate this interview answer based on the question and expected keywords.
@@ -108,7 +108,8 @@ async def evaluate_answer_ai(
         )
 
     except Exception as e:
-        print(f"AI evaluation failed: {e}, falling back to mock evaluation")
+        import traceback
+        print(f"AI evaluation failed: {e}\n{traceback.format_exc()}")
         return evaluate_answer_mock(question_content, answer, expected_keywords)
 
 

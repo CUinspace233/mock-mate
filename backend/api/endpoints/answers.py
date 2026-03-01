@@ -239,6 +239,8 @@ async def evaluate_answer(request: EvaluateAnswerRequest, db: AsyncSession = Dep
             created_at=answer_evaluation.created_at or datetime.now(UTC),
         )
 
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid user_id: {str(e)}"

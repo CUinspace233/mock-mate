@@ -72,7 +72,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const setOpenaiApiKey = useAuthStore((state) => state.setOpenaiApiKey);
 
   const [activeTab, setActiveTab] = useState<number>(0);
-  const [interviewStarted, setInterviewStarted] = useState<boolean>(!!sessionId);
+  const [interviewStarted, setInterviewStarted] = useState<boolean>(false);
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>(Difficulty.EASY);
   const [selectedQuestionType, setSelectedQuestionType] = useState<QuestionType>(
     QuestionType.TECHNICAL,

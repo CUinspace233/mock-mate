@@ -272,8 +272,15 @@ export default function InterviewChat({
     [setMessages, setCurrentQuestion, setAwaitingAnswer, onPresetQuestionUsed],
   );
 
+  const hasInitialized = useRef(false);
+
   useEffect(() => {
-    if (interviewStarted && messages.length === 0) {
+    if (!interviewStarted) {
+      hasInitialized.current = false;
+      return;
+    }
+    if (messages.length === 0 && !hasInitialized.current) {
+      hasInitialized.current = true;
       if (presetQuestion) {
         processPresetQuestion(presetQuestion);
       } else {

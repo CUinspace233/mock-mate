@@ -9,6 +9,8 @@ type AuthState = {
   dailyQuestionDate: string;
   selectedPosition: string;
   sessionId: string | null;
+  questionCountTarget: number;
+  setQuestionCountTarget: (count: number) => void;
   openaiApiKey: string;
   setOpenaiApiKey: (apiKey: string) => void;
   setDailyQuestionCount: (count: number) => void;
@@ -30,6 +32,8 @@ export const useAuthStore = create<AuthState>()(
       dailyQuestionDate: "",
       selectedPosition: "frontend",
       sessionId: null,
+      questionCountTarget: 5,
+      setQuestionCountTarget: (count) => set({ questionCountTarget: count }),
       openaiApiKey: "",
       setOpenaiApiKey: (apiKey) => set({ openaiApiKey: apiKey }),
       setDailyQuestionCount: (count) => set({ dailyQuestionCount: count }),
@@ -50,6 +54,7 @@ export const useAuthStore = create<AuthState>()(
         dailyQuestionDate: state.dailyQuestionDate,
         selectedPosition: state.selectedPosition,
         sessionId: state.sessionId,
+        questionCountTarget: state.questionCountTarget,
         openaiApiKey: state.openaiApiKey,
       }),
     },

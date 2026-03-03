@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Card,
@@ -68,6 +68,8 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const setSelectedPosition = useAuthStore((state) => state.setSelectedPosition);
   const sessionId = useAuthStore((state) => state.sessionId);
   const setSessionId = useAuthStore((state) => state.setSessionId);
+  const questionCountTarget = useAuthStore((state) => state.questionCountTarget);
+  const setQuestionCountTarget = useAuthStore((state) => state.setQuestionCountTarget);
   const openaiApiKey = useAuthStore((state) => state.openaiApiKey);
   const setOpenaiApiKey = useAuthStore((state) => state.setOpenaiApiKey);
 
@@ -78,9 +80,16 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
     QuestionType.TECHNICAL,
   );
 
+  const [currentQuestionNumber, setCurrentQuestionNumber] = useState(0);
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<Message | null>(null);
   const [awaitingAnswer, setAwaitingAnswer] = useState(false);
+
+  const handleQuestionNumberIncrement = useCallback(
+    () => setCurrentQuestionNumber((n) => n + 1),
+    [],
+  );
 
   const [pendingNewsQuestion, setPendingNewsQuestion] = useState<NewsQuestion | null>(null);
   useEffect(() => {
@@ -131,6 +140,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
     setMessages([]);
     setCurrentQuestion(null);
     setAwaitingAnswer(false);
+    setCurrentQuestionNumber(0);
     setSessionId(null);
   };
 
@@ -388,6 +398,20 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
                 </Chip>
               </Option>
             </Select>
+
+            <Typography level="title-md" sx={{ flexShrink: 0 }}>
+              Question Count:
+            </Typography>
+            <Select
+              value={questionCountTarget}
+              onChange={(_, value) => value && setQuestionCountTarget(value as number)}
+              sx={{ minWidth: { xs: "100%", sm: 100 } }}
+            >
+              <Option value={3}>3</Option>
+              <Option value={5}>5</Option>
+              <Option value={8}>8</Option>
+              <Option value={10}>10</Option>
+            </Select>
           </Stack>
         </CardContent>
       </Card>
@@ -440,6 +464,9 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
               onPresetQuestionUsed={handleNewsQuestionUsed}
               questionType={selectedQuestionType}
               openaiApiKey={openaiApiKey}
+              questionCountTarget={questionCountTarget}
+              currentQuestionNumber={currentQuestionNumber}
+              onQuestionNumberIncrement={handleQuestionNumberIncrement}
             />
           </TabPanel>
 

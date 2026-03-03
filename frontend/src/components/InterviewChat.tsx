@@ -61,6 +61,9 @@ interface InterviewChatProps {
   onPresetQuestionUsed?: () => void;
   questionType: QuestionType;
   openaiApiKey: string;
+  questionCountTarget: number;
+  currentQuestionNumber: number;
+  onQuestionNumberIncrement: () => void;
 }
 
 export default function InterviewChat({
@@ -81,6 +84,9 @@ export default function InterviewChat({
   onPresetQuestionUsed,
   questionType,
   openaiApiKey,
+  questionCountTarget,
+  currentQuestionNumber,
+  onQuestionNumberIncrement,
 }: InterviewChatProps) {
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -89,6 +95,7 @@ export default function InterviewChat({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showAlert, setShowAlert] = useState(true);
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_responseId, setResponseId] = useState<string | null>(null); // OpenAI response ID for follow-up chaining
 
   const scrollToBottom = () => {
@@ -174,6 +181,7 @@ export default function InterviewChat({
 
       setCurrentQuestion(questionMessage);
       setAwaitingAnswer(true);
+      onQuestionNumberIncrement();
     } catch (err: unknown) {
       // Fallback to non-streaming API
       try {
@@ -222,6 +230,7 @@ export default function InterviewChat({
 
         setCurrentQuestion(questionMessage);
         setAwaitingAnswer(true);
+        onQuestionNumberIncrement();
       } catch (fallbackErr: unknown) {
         // Remove placeholder if present
         setMessages((prev) => prev.filter((m) => !m.id.startsWith("temp-question-")));
@@ -245,6 +254,7 @@ export default function InterviewChat({
     setAwaitingAnswer,
     questionType,
     openaiApiKey,
+    onQuestionNumberIncrement,
   ]);
 
   const processPresetQuestion = useCallback(
@@ -270,12 +280,13 @@ export default function InterviewChat({
       setMessages((prev) => [...prev, newsInfoMessage, questionMessage]);
       setCurrentQuestion(questionMessage);
       setAwaitingAnswer(true);
+      onQuestionNumberIncrement();
 
       if (onPresetQuestionUsed) {
         onPresetQuestionUsed();
       }
     },
-    [setMessages, setCurrentQuestion, setAwaitingAnswer, onPresetQuestionUsed],
+    [setMessages, setCurrentQuestion, setAwaitingAnswer, onQuestionNumberIncrement, onPresetQuestionUsed],
   );
 
   const hasInitialized = useRef(false);
@@ -442,6 +453,24 @@ export default function InterviewChat({
 
   return (
     <Box sx={{ height: "600px", display: "flex", flexDirection: "column" }}>
+      {/* Question Progress */}
+      {currentQuestionNumber > 0 && (
+        <Box sx={{ px: 2, pt: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+          <Chip
+            size="sm"
+            variant="soft"
+            color={currentQuestionNumber >= questionCountTarget ? "success" : "primary"}
+          >
+            Question {currentQuestionNumber} / {questionCountTarget}
+          </Chip>
+          {currentQuestionNumber >= questionCountTarget && !awaitingAnswer && (
+            <Alert size="sm" color="success" variant="soft" sx={{ flex: 1, py: 0.5 }}>
+              You've reached your target! Feel free to continue or complete the session.
+            </Alert>
+          )}
+        </Box>
+      )}
+
       {/* Error Alert */}
       {error && (
         <Box sx={{ p: 2 }}>

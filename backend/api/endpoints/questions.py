@@ -39,19 +39,15 @@ async def generate_ai_question(
         + " Return only the question."
     )
 
-    response = client.chat.completions.create(
+    response = client.responses.create(
         model="gpt-4.1-nano",
-        messages=[
-            {"role": "system", "content": "You are an expert interview question generator."},
-            {"role": "user", "content": prompt},
-        ],
-        max_tokens=100,
+        instructions="You are an expert interview question generator.",
+        input=prompt,
+        max_output_tokens=100,
         temperature=0.9,
-        frequency_penalty=0.8,
-        presence_penalty=0.8,
     )
 
-    question_content = (response.choices[0].message.content or "").strip()
+    question_content = (response.output_text or "").strip()
 
     return GeneratedQuestion(
         content=question_content,
@@ -70,27 +66,26 @@ async def generate_question_stream(req: GenerateQuestionRequest, db: AsyncSessio
     client = _get_client(req.openai_api_key)
     prompt = f"Generate a {req.difficulty} level {req.question_type} interview question for a {req.position} position Return only the question."
 
-    stream = client.chat.completions.create(
-        model="gpt-4.1-nano",
-        messages=[
-            {"role": "system", "content": "You are an expert interview question generator."},
-            {"role": "user", "content": prompt},
-        ],
-        max_tokens=100,
-        temperature=0.9,
-        frequency_penalty=0.8,
-        presence_penalty=0.8,
-        stream=True,
-    )
-
     async def sse_iter():
         content = ""
-        for chunk in stream:
-            delta = (chunk.choices[0].delta.content or "")
-            if not delta:
-                continue
-            content += delta
-            yield f"event: content\ndata: {json.dumps({'delta': delta})}\n\n"
+        response_id = None
+
+        with client.responses.stream(
+            model="gpt-4.1-nano",
+            instructions="You are an expert interview question generator.",
+            input=prompt,
+            max_output_tokens=100,
+            temperature=0.9,
+        ) as stream:
+            for event in stream:
+                if event.type == "response.output_text.delta":
+                    delta = event.delta
+                    if not delta:
+                        continue
+                    content += delta
+                    yield f"event: content\ndata: {json.dumps({'delta': delta})}\n\n"
+            final_response = stream.get_final_response()
+            response_id = final_response.id
 
         # Save question to database so /answers/evaluate can find it
         question = models.Question(
@@ -112,6 +107,7 @@ async def generate_question_stream(req: GenerateQuestionRequest, db: AsyncSessio
             "question_type": req.question_type,
             "expected_keywords": ["technical", "explanation", "examples"],
             "created_at": (question.created_at or datetime.now(timezone.utc)).isoformat(),
+            "response_id": response_id,
         }
         yield f"event: final\ndata: {json.dumps(final)}\n\n"
         yield "event: end\ndata: {}\n\n"

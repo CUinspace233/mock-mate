@@ -6,7 +6,6 @@ from database import models
 from api.deps import get_db
 from datetime import datetime, UTC
 from openai import OpenAI
-from openai.types.shared_params import ResponseFormatJSONSchema
 from database.schemas import (
     EvaluateAnswerRequest,
     EvaluateAnswerResponse,
@@ -18,9 +17,9 @@ import json
 router = APIRouter()
 
 
-EVALUATION_SCHEMA: ResponseFormatJSONSchema = {
-    "type": "json_schema",
-    "json_schema": {
+EVALUATION_TEXT_FORMAT = {
+    "format": {
+        "type": "json_schema",
         "name": "answer_evaluation",
         "strict": True,
         "schema": {
@@ -74,21 +73,16 @@ async def evaluate_answer_ai(
     """
 
     try:
-        response = client.chat.completions.create(
+        response = client.responses.create(
             model="gpt-4.1-nano",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are an expert technical interviewer. Evaluate answers objectively and provide constructive feedback.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-            max_tokens=800,
+            instructions="You are an expert technical interviewer. Evaluate answers objectively and provide constructive feedback.",
+            input=prompt,
+            max_output_tokens=800,
             temperature=0.3,
-            response_format=EVALUATION_SCHEMA,
+            text=EVALUATION_TEXT_FORMAT,
         )
 
-        evaluation = json.loads(response.choices[0].message.content or "{}")
+        evaluation = json.loads(response.output_text or "{}")
 
         evaluation_details = EvaluationDetails(
             technical_accuracy=min(max(float(evaluation["technical_accuracy"]), 0), 100),

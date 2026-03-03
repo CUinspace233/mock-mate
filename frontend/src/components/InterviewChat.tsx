@@ -89,6 +89,7 @@ export default function InterviewChat({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showAlert, setShowAlert] = useState(true);
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
+  const [_responseId, setResponseId] = useState<string | null>(null); // OpenAI response ID for follow-up chaining
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -158,6 +159,11 @@ export default function InterviewChat({
             : m,
         ),
       );
+
+      // Save OpenAI response ID for future follow-up chaining
+      if (finalData.response_id) {
+        setResponseId(finalData.response_id);
+      }
 
       const questionMessage: Message = {
         id: finalData.question_id,

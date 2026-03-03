@@ -230,20 +230,16 @@ async def generate_question_from_news(
 
         # Use async OpenAI client
         client = AsyncOpenAI(api_key=openai_api_key) if openai_api_key else AsyncOpenAI()
-        response = await client.chat.completions.create(
+        response = await client.responses.create(
             model="gpt-4.1-nano",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are an expert technical interviewer who creates insightful questions based on current industry news and trends.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-            max_tokens=300,
+            instructions="You are an expert technical interviewer who creates insightful questions based on current industry news and trends.",
+            input=prompt,
+            max_output_tokens=300,
             temperature=0.7,
+            store=False,
         )
 
-        content = (response.choices[0].message.content or "").strip()
+        content = (response.output_text or "").strip()
         logger.info(f"🎯 AI Response: {content[:100]}...")
 
         # Parse the response

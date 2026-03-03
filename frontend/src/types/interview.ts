@@ -60,6 +60,7 @@ export interface GenerateQuestionResponse {
   question_type: QuestionType;
   expected_keywords: string[];
   created_at: string;
+  response_id?: string; // OpenAI Responses API response ID for follow-up chaining
 }
 
 export interface EvaluateAnswerRequest {

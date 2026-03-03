@@ -70,6 +70,8 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const setSessionId = useAuthStore((state) => state.setSessionId);
   const questionCountTarget = useAuthStore((state) => state.questionCountTarget);
   const setQuestionCountTarget = useAuthStore((state) => state.setQuestionCountTarget);
+  const followUpLimit = useAuthStore((state) => state.followUpLimit);
+  const setFollowUpLimit = useAuthStore((state) => state.setFollowUpLimit);
   const openaiApiKey = useAuthStore((state) => state.openaiApiKey);
   const setOpenaiApiKey = useAuthStore((state) => state.setOpenaiApiKey);
 
@@ -412,6 +414,22 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
               <Option value={8}>8</Option>
               <Option value={10}>10</Option>
             </Select>
+
+            <Typography level="title-md" sx={{ flexShrink: 0 }}>
+              Follow-ups:
+            </Typography>
+            <Select
+              value={followUpLimit}
+              onChange={(_, value) => value !== null && setFollowUpLimit(value as number)}
+              sx={{ minWidth: { xs: "100%", sm: 100 } }}
+            >
+              <Option value={0}>0 (Off)</Option>
+              <Option value={1}>1</Option>
+              <Option value={2}>2</Option>
+              <Option value={3}>3</Option>
+              <Option value={4}>4</Option>
+              <Option value={5}>5</Option>
+            </Select>
           </Stack>
         </CardContent>
       </Card>
@@ -467,6 +485,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
               questionCountTarget={questionCountTarget}
               currentQuestionNumber={currentQuestionNumber}
               onQuestionNumberIncrement={handleQuestionNumberIncrement}
+              followUpLimit={followUpLimit}
             />
           </TabPanel>
 

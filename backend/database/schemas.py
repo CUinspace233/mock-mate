@@ -112,6 +112,31 @@ class GeneratedQuestion(BaseModel):
 
 
 # Answer Evaluation
+class ConversationEntry(BaseModel):
+    role: str  # "interviewer" or "candidate"
+    content: str
+
+
+class GenerateFollowUpRequest(BaseModel):
+    original_question: str
+    conversation_history: list[ConversationEntry]
+    follow_up_number: int
+    max_follow_ups: int
+    position: str
+    difficulty: str | None = "medium"
+    user_id: int
+    openai_api_key: str
+
+
+class EvaluateFollowUpRequest(BaseModel):
+    question_id: str
+    user_id: int
+    original_question: str
+    conversation_history: list[ConversationEntry]
+    session_id: str | None = None
+    openai_api_key: str
+
+
 class EvaluateAnswerRequest(BaseModel):
     question_id: str
     user_id: int

@@ -4,6 +4,9 @@ import type {
   GenerateQuestionResponse,
   EvaluateAnswerRequest,
   EvaluateAnswerResponse,
+  FollowUpRequest,
+  FollowUpStreamResponse,
+  EvaluateFollowUpRequest,
   InterviewRecord,
   InterviewRecordSaveResponse,
   StartSessionRequest,
@@ -88,6 +91,61 @@ export async function evaluateAnswer(
   request: EvaluateAnswerRequest,
 ): Promise<EvaluateAnswerResponse> {
   const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/answers/evaluate`, request);
+  return res.data;
+}
+
+export async function generateFollowUpStream(
+  request: FollowUpRequest,
+  onDelta: (delta: string) => void,
+): Promise<FollowUpStreamResponse> {
+  const res = await fetch(
+    `${import.meta.env.VITE_API_URL}/api/questions/generate/followup/stream`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      body: JSON.stringify(request),
+    },
+  );
+  if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let final: FollowUpStreamResponse | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() || "";
+
+    for (const chunk of parts) {
+      const lines = chunk.split("\n");
+      const eventLine = lines.find((l) => l.startsWith("event: "));
+      const dataLine = lines.find((l) => l.startsWith("data: "));
+      if (!dataLine) continue;
+
+      const payload = JSON.parse(dataLine.slice(6));
+      const evt = eventLine ? eventLine.slice(7) : "message";
+
+      if (evt === "content" && payload.delta) onDelta(payload.delta);
+      if (evt === "final") final = payload as FollowUpStreamResponse;
+    }
+  }
+
+  if (!final) throw new Error("Stream ended without final payload");
+  return final;
+}
+
+export async function evaluateFollowUpConversation(
+  request: EvaluateFollowUpRequest,
+): Promise<EvaluateAnswerResponse> {
+  const res = await axios.post(
+    `${import.meta.env.VITE_API_URL}/api/answers/evaluate/followup`,
+    request,
+  );
   return res.data;
 }
 

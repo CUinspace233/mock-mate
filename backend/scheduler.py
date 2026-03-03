@@ -25,7 +25,7 @@ async def fetch_news_task():
             result = await db.execute(recent_fetch_stmt)
             recent_source = result.scalar_one_or_none()
 
-            if recent_source:
+            if recent_source and recent_source.last_fetched is not None:
                 last_fetch_time = recent_source.last_fetched
                 time_since_last = datetime.now(UTC) - last_fetch_time
                 hours_since = time_since_last.total_seconds() / 3600

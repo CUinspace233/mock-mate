@@ -12,6 +12,7 @@ from database.schemas import (
     GeneratedQuestion,
     GenerateQuestionRequest,
     GenerateQuestionResponse,
+    GenerateFollowUpRequest,
     QuestionCategory,
     QuestionCategoriesResponse,
     QuestionOut,
@@ -113,6 +114,80 @@ async def generate_question_stream(req: GenerateQuestionRequest, db: AsyncSessio
         yield "event: end\ndata: {}\n\n"
 
     return StreamingResponse(sse_iter(), media_type="text/event-stream")
+
+@router.post("/generate/followup/stream")
+async def generate_followup_stream(req: GenerateFollowUpRequest, db: AsyncSession = Depends(get_db)):
+    """Generate a follow-up question based on conversation history, streamed via SSE."""
+    client = _get_client(req.openai_api_key)
+
+    # Build conversation context for OpenAI
+    conversation_text = ""
+    for entry in req.conversation_history:
+        label = "Interviewer" if entry.role == "interviewer" else "Candidate"
+        conversation_text += f"{label}: {entry.content}\n\n"
+
+    prompt = (
+        f"Position: {req.position}, Difficulty: {req.difficulty}\n"
+        f"This is follow-up #{req.follow_up_number} of {req.max_follow_ups}.\n\n"
+        f"Conversation so far:\n{conversation_text}\n"
+        "Based on the candidate's last answer, generate a probing follow-up question "
+        "that digs deeper into their understanding. Return only the follow-up question."
+    )
+
+    async def sse_iter():
+        content = ""
+        response_id = None
+
+        with client.responses.stream(
+            model="gpt-4.1-nano",
+            instructions=(
+                "You are an expert technical interviewer conducting a multi-round interview. "
+                "Generate insightful follow-up questions that probe deeper into the candidate's "
+                "knowledge based on their previous answers."
+            ),
+            input=prompt,
+            max_output_tokens=150,
+            temperature=0.7,
+        ) as stream:
+            for event in stream:
+                if event.type == "response.output_text.delta":
+                    delta = event.delta
+                    if not delta:
+                        continue
+                    content += delta
+                    yield f"event: content\ndata: {json.dumps({'delta': delta})}\n\n"
+            final_response = stream.get_final_response()
+            response_id = final_response.id
+
+        # Save follow-up question to database
+        question = models.Question(
+            content=content.strip(),
+            position=req.position,
+            difficulty=req.difficulty or "medium",
+            question_type=QuestionType.TECHNICAL,
+            expected_keywords=["depth", "understanding", "follow-up"],
+        )
+        db.add(question)
+        await db.commit()
+        await db.refresh(question)
+
+        final = {
+            "question_id": str(question.id),
+            "content": content.strip(),
+            "position": req.position,
+            "difficulty": req.difficulty or "medium",
+            "question_type": QuestionType.TECHNICAL,
+            "expected_keywords": ["depth", "understanding", "follow-up"],
+            "created_at": (question.created_at or datetime.now(timezone.utc)).isoformat(),
+            "response_id": response_id,
+            "is_follow_up": True,
+            "follow_up_number": req.follow_up_number,
+        }
+        yield f"event: final\ndata: {json.dumps(final)}\n\n"
+        yield "event: end\ndata: {}\n\n"
+
+    return StreamingResponse(sse_iter(), media_type="text/event-stream")
+
 
 @router.post("/generate", response_model=GenerateQuestionResponse)
 async def generate_question(

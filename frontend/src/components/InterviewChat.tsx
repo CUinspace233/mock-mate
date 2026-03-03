@@ -28,12 +28,15 @@ import {
 import {
   generateQuestion as generateQuestionApi,
   generateQuestionStream as generateQuestionStreamApi,
+  generateFollowUpStream as generateFollowUpStreamApi,
   evaluateAnswer as evaluateAnswerApi,
+  evaluateFollowUpConversation as evaluateFollowUpApi,
   saveInterviewRecord,
 } from "../api/api";
 import {
   type EvaluateAnswerResponse,
   type GenerateQuestionRequest,
+  type ConversationEntry,
   type PositionKey,
   Difficulty,
   type Message,
@@ -64,6 +67,7 @@ interface InterviewChatProps {
   questionCountTarget: number;
   currentQuestionNumber: number;
   onQuestionNumberIncrement: () => void;
+  followUpLimit: number;
 }
 
 export default function InterviewChat({
@@ -87,6 +91,7 @@ export default function InterviewChat({
   questionCountTarget,
   currentQuestionNumber,
   onQuestionNumberIncrement,
+  followUpLimit,
 }: InterviewChatProps) {
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -97,6 +102,13 @@ export default function InterviewChat({
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_responseId, setResponseId] = useState<string | null>(null); // OpenAI response ID for follow-up chaining
+
+  // Follow-up state
+  const [followUpCount, setFollowUpCount] = useState(0);
+  const [conversationHistory, setConversationHistory] = useState<ConversationEntry[]>([]);
+  const [mainQuestionContent, setMainQuestionContent] = useState("");
+  const [mainQuestionId, setMainQuestionId] = useState<string | null>(null);
+  const [isInFollowUpMode, setIsInFollowUpMode] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -182,6 +194,16 @@ export default function InterviewChat({
       setCurrentQuestion(questionMessage);
       setAwaitingAnswer(true);
       onQuestionNumberIncrement();
+
+      // Initialize follow-up tracking for this question
+      if (followUpLimit > 0) {
+        const questionContent = finalData.content || "";
+        setMainQuestionContent(questionContent);
+        setMainQuestionId(finalData.question_id);
+        setConversationHistory([{ role: "interviewer", content: questionContent }]);
+        setFollowUpCount(0);
+        setIsInFollowUpMode(true);
+      }
     } catch (err: unknown) {
       // Fallback to non-streaming API
       try {
@@ -231,6 +253,16 @@ export default function InterviewChat({
         setCurrentQuestion(questionMessage);
         setAwaitingAnswer(true);
         onQuestionNumberIncrement();
+
+        // Initialize follow-up tracking for this question
+        if (followUpLimit > 0) {
+          const questionContent = data.content || "";
+          setMainQuestionContent(questionContent);
+          setMainQuestionId(data.question_id);
+          setConversationHistory([{ role: "interviewer", content: questionContent }]);
+          setFollowUpCount(0);
+          setIsInFollowUpMode(true);
+        }
       } catch (fallbackErr: unknown) {
         // Remove placeholder if present
         setMessages((prev) => prev.filter((m) => !m.id.startsWith("temp-question-")));
@@ -255,6 +287,7 @@ export default function InterviewChat({
     questionType,
     openaiApiKey,
     onQuestionNumberIncrement,
+    followUpLimit,
   ]);
 
   const processPresetQuestion = useCallback(
@@ -282,11 +315,20 @@ export default function InterviewChat({
       setAwaitingAnswer(true);
       onQuestionNumberIncrement();
 
+      // Initialize follow-up tracking for preset question
+      if (followUpLimit > 0) {
+        setMainQuestionContent(newsQuestion.content);
+        setMainQuestionId(newsQuestion.id);
+        setConversationHistory([{ role: "interviewer", content: newsQuestion.content }]);
+        setFollowUpCount(0);
+        setIsInFollowUpMode(true);
+      }
+
       if (onPresetQuestionUsed) {
         onPresetQuestionUsed();
       }
     },
-    [setMessages, setCurrentQuestion, setAwaitingAnswer, onQuestionNumberIncrement, onPresetQuestionUsed],
+    [setMessages, setCurrentQuestion, setAwaitingAnswer, onQuestionNumberIncrement, onPresetQuestionUsed, followUpLimit],
   );
 
   const hasInitialized = useRef(false);
@@ -306,13 +348,170 @@ export default function InterviewChat({
     }
   }, [interviewStarted, messages.length, presetQuestion, processPresetQuestion, generateQuestion]);
 
+  const resetFollowUpState = () => {
+    setFollowUpCount(0);
+    setConversationHistory([]);
+    setMainQuestionContent("");
+    setMainQuestionId(null);
+    setIsInFollowUpMode(false);
+  };
+
+  const handleEvaluateAndSave = async (
+    questionId: string,
+    questionContent: string,
+    answer: string,
+    history: ConversationEntry[],
+  ) => {
+    let evaluationResponse: EvaluateAnswerResponse;
+
+    if (isInFollowUpMode && history.length > 2) {
+      // Multi-turn: evaluate full conversation
+      evaluationResponse = await evaluateFollowUpApi({
+        question_id: questionId,
+        user_id: user_id,
+        original_question: mainQuestionContent,
+        conversation_history: history,
+        session_id: sessionId || undefined,
+        openai_api_key: openaiApiKey,
+      });
+    } else {
+      // Single-turn: evaluate just the answer
+      evaluationResponse = await evaluateAnswerApi({
+        question_id: questionId,
+        user_id: user_id,
+        answer: answer,
+        openai_api_key: openaiApiKey,
+      });
+    }
+
+    const evaluationContent = formatEvaluationContent(evaluationResponse);
+
+    const evaluationMessage: Message = {
+      id: evaluationResponse.evaluation_id,
+      sender: "ai",
+      content: evaluationContent,
+      timestamp: new Date(evaluationResponse.created_at),
+      score: evaluationResponse.score,
+      feedback: evaluationContent,
+      strengths: evaluationResponse.strengths,
+      improvements: evaluationResponse.improvements,
+      keywordsCovered: evaluationResponse.keywords_covered,
+      keywordsMissed: evaluationResponse.keywords_missed,
+      evaluation_details: evaluationResponse.evaluation_details,
+    };
+
+    setMessages((prev) => [...prev, evaluationMessage]);
+
+    // Concatenate all candidate answers for the record
+    const allAnswers = isInFollowUpMode && history.length > 2
+      ? history
+          .filter((e) => e.role === "candidate")
+          .map((e) => e.content)
+          .join("\n---\n")
+      : answer;
+
+    saveInterviewRecord(user_id, {
+      id: null,
+      created_at: null,
+      question_content: questionContent,
+      answer: allAnswers,
+      score: evaluationMessage.score || 0,
+      feedback: evaluationContent,
+      position: (presetQuestion?.position as PositionKey) || (selectedPosition as PositionKey),
+      session_id: sessionId || null,
+      question_id: questionId,
+      user_id: user_id,
+      evaluation_details: evaluationMessage.evaluation_details || {
+        technical_accuracy: 0,
+        communication_clarity: 0,
+        completeness: 0,
+        practical_experience: 0,
+      },
+    });
+
+    setCurrentQuestion(null);
+    resetFollowUpState();
+  };
+
+  const handleGenerateFollowUp = async (updatedHistory: ConversationEntry[]) => {
+    const nextFollowUpNumber = followUpCount + 1;
+
+    // Insert a placeholder for the follow-up question
+    const placeholderId = `temp-followup-${Date.now()}`;
+    const placeholderMessage: Message = {
+      id: placeholderId,
+      sender: "ai",
+      content: "",
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, placeholderMessage]);
+
+    let firstDeltaHandled = false;
+
+    const finalData = await generateFollowUpStreamApi(
+      {
+        original_question: mainQuestionContent,
+        conversation_history: updatedHistory,
+        follow_up_number: nextFollowUpNumber,
+        max_follow_ups: followUpLimit,
+        position: selectedPosition,
+        difficulty: selectedDifficulty,
+        user_id: user_id,
+        openai_api_key: openaiApiKey,
+      },
+      (delta: string) => {
+        if (!firstDeltaHandled) {
+          firstDeltaHandled = true;
+          setIsLoading(false);
+        }
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === placeholderId ? { ...m, content: (m.content || "") + delta } : m,
+          ),
+        );
+      },
+    );
+
+    // Finalize the streamed follow-up message
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === placeholderId
+          ? {
+              ...m,
+              id: finalData.question_id,
+              content: finalData.content || m.content,
+              timestamp: new Date(finalData.created_at),
+            }
+          : m,
+      ),
+    );
+
+    const followUpMessage: Message = {
+      id: finalData.question_id,
+      sender: "ai",
+      content: finalData.content || "",
+      timestamp: new Date(finalData.created_at),
+    };
+
+    // Update conversation history with the follow-up question
+    const newHistory: ConversationEntry[] = [
+      ...updatedHistory,
+      { role: "interviewer", content: finalData.content || "" },
+    ];
+    setConversationHistory(newHistory);
+    setFollowUpCount(nextFollowUpNumber);
+    setCurrentQuestion(followUpMessage);
+    setAwaitingAnswer(true);
+  };
+
   const handleSendAnswer = async () => {
     if (!currentAnswer.trim() || !currentQuestion) return;
 
+    const answerText = currentAnswer;
     const userMessage: Message = {
       id: Date.now().toString(),
       sender: "user",
-      content: currentAnswer,
+      content: answerText,
       timestamp: new Date(),
     };
 
@@ -322,56 +521,41 @@ export default function InterviewChat({
     setAwaitingAnswer(false);
 
     try {
-      const evaluationResponse = await evaluateAnswerApi({
-        question_id: currentQuestion.id,
-        user_id: user_id,
-        answer: currentAnswer,
-        openai_api_key: openaiApiKey,
-      });
+      // If follow-ups are disabled, use original single-turn behavior
+      if (followUpLimit === 0 || !isInFollowUpMode) {
+        await handleEvaluateAndSave(
+          currentQuestion.id,
+          currentQuestion.content,
+          answerText,
+          [],
+        );
+        return;
+      }
 
-      const evaluationContent = formatEvaluationContent(evaluationResponse);
+      // Follow-up mode: update conversation history with candidate answer
+      const updatedHistory: ConversationEntry[] = [
+        ...conversationHistory,
+        { role: "candidate", content: answerText },
+      ];
+      setConversationHistory(updatedHistory);
 
-      const evaluationMessage: Message = {
-        id: evaluationResponse.evaluation_id,
-        sender: "ai",
-        content: evaluationContent,
-        timestamp: new Date(evaluationResponse.created_at),
-        score: evaluationResponse.score,
-        feedback: evaluationContent,
-        strengths: evaluationResponse.strengths,
-        improvements: evaluationResponse.improvements,
-        keywordsCovered: evaluationResponse.keywords_covered,
-        keywordsMissed: evaluationResponse.keywords_missed,
-        evaluation_details: evaluationResponse.evaluation_details,
-      };
-
-      setMessages((prev) => [...prev, evaluationMessage]);
-
-      saveInterviewRecord(user_id, {
-        id: null,
-        created_at: null,
-        question_content: currentQuestion.content,
-        answer: currentAnswer,
-        score: evaluationMessage.score || 0,
-        feedback: evaluationContent,
-        position: (presetQuestion?.position as PositionKey) || (selectedPosition as PositionKey),
-        session_id: sessionId || null,
-        question_id: currentQuestion.id,
-        user_id: user_id,
-        evaluation_details: evaluationMessage.evaluation_details || {
-          technical_accuracy: 0,
-          communication_clarity: 0,
-          completeness: 0,
-          practical_experience: 0,
-        },
-      });
-
-      setCurrentQuestion(null);
+      if (followUpCount < followUpLimit) {
+        // Generate follow-up question
+        await handleGenerateFollowUp(updatedHistory);
+      } else {
+        // Reached follow-up limit — evaluate the full conversation
+        await handleEvaluateAndSave(
+          mainQuestionId || currentQuestion.id,
+          mainQuestionContent,
+          answerText,
+          updatedHistory,
+        );
+      }
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(`Failed to evaluate answer: ${err.message}`);
+        setError(`Failed to process answer: ${err.message}`);
       } else {
-        setError("Failed to evaluate answer. Please try again.");
+        setError("Failed to process answer. Please try again.");
       }
     } finally {
       setIsLoading(false);
@@ -455,7 +639,7 @@ export default function InterviewChat({
     <Box sx={{ height: "600px", display: "flex", flexDirection: "column" }}>
       {/* Question Progress */}
       {currentQuestionNumber > 0 && (
-        <Box sx={{ px: 2, pt: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+        <Box sx={{ px: 2, pt: 1.5, display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
           <Chip
             size="sm"
             variant="soft"
@@ -463,7 +647,12 @@ export default function InterviewChat({
           >
             Question {currentQuestionNumber} / {questionCountTarget}
           </Chip>
-          {currentQuestionNumber >= questionCountTarget && !awaitingAnswer && (
+          {isInFollowUpMode && followUpLimit > 0 && (
+            <Chip size="sm" variant="soft" color="warning">
+              Follow-up {followUpCount} / {followUpLimit}
+            </Chip>
+          )}
+          {currentQuestionNumber >= questionCountTarget && !awaitingAnswer && !isInFollowUpMode && (
             <Alert size="sm" color="success" variant="soft" sx={{ flex: 1, py: 0.5 }}>
               You've reached your target! Feel free to continue or complete the session.
             </Alert>

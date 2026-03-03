@@ -71,6 +71,37 @@ export interface EvaluateAnswerRequest {
   openai_api_key: string;
 }
 
+// Follow-up conversation types
+export interface ConversationEntry {
+  role: "interviewer" | "candidate";
+  content: string;
+}
+
+export interface FollowUpRequest {
+  original_question: string;
+  conversation_history: ConversationEntry[];
+  follow_up_number: number;
+  max_follow_ups: number;
+  position: string;
+  difficulty: string | null;
+  user_id: number;
+  openai_api_key: string;
+}
+
+export interface FollowUpStreamResponse extends GenerateQuestionResponse {
+  is_follow_up: boolean;
+  follow_up_number: number;
+}
+
+export interface EvaluateFollowUpRequest {
+  question_id: string;
+  user_id: number;
+  original_question: string;
+  conversation_history: ConversationEntry[];
+  session_id?: string;
+  openai_api_key: string;
+}
+
 export interface EvaluationDetails {
   technical_accuracy: number;
   communication_clarity: number;

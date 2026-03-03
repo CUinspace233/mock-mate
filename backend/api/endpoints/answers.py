@@ -8,6 +8,7 @@ from datetime import datetime, UTC
 from openai import OpenAI
 from database.schemas import (
     EvaluateAnswerRequest,
+    EvaluateFollowUpRequest,
     EvaluateAnswerResponse,
     EvaluationDetails,
     AnswerEvaluationResult,
@@ -244,4 +245,137 @@ async def evaluate_answer(request: EvaluateAnswerRequest, db: AsyncSession = Dep
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to evaluate answer: {str(e)}",
+        )
+
+
+async def evaluate_followup_ai(
+    original_question: str,
+    conversation_history: list[dict],
+    openai_api_key: str = "",
+) -> AnswerEvaluationResult:
+    """AI-powered evaluation of a full multi-turn interview conversation."""
+    client = OpenAI(api_key=openai_api_key) if openai_api_key else OpenAI()
+
+    conversation_text = ""
+    for entry in conversation_history:
+        label = "Interviewer" if entry["role"] == "interviewer" else "Candidate"
+        conversation_text += f"{label}: {entry['content']}\n\n"
+
+    prompt = f"""
+    Evaluate this multi-round interview conversation holistically.
+
+    Original Question: {original_question}
+
+    Full Conversation:
+    {conversation_text}
+
+    Score based on: technical accuracy (40%), communication clarity (30%), completeness (20%), practical experience (10%).
+    Consider how well the candidate handled follow-up questions and whether their answers showed depth of understanding.
+    All sub-scores (technical_accuracy, communication_clarity, completeness, practical_experience) should be 0-100.
+    The overall score should also be 0-100.
+    """
+
+    try:
+        response = client.responses.create(
+            model="gpt-4.1-nano",
+            instructions=(
+                "You are an expert technical interviewer. Evaluate the entire multi-turn "
+                "conversation objectively. Pay special attention to how the candidate responds "
+                "to follow-up questions — do they demonstrate deeper understanding, or do they "
+                "falter under probing? Provide constructive feedback."
+            ),
+            input=prompt,
+            max_output_tokens=800,
+            temperature=0.3,
+            text=EVALUATION_TEXT_FORMAT,
+        )
+
+        evaluation = json.loads(response.output_text or "{}")
+
+        evaluation_details = EvaluationDetails(
+            technical_accuracy=min(max(float(evaluation["technical_accuracy"]), 0), 100),
+            communication_clarity=min(max(float(evaluation["communication_clarity"]), 0), 100),
+            completeness=min(max(float(evaluation["completeness"]), 0), 100),
+            practical_experience=min(max(float(evaluation["practical_experience"]), 0), 100),
+        )
+
+        return AnswerEvaluationResult(
+            score=min(max(int(evaluation["score"]), 0), 100),
+            feedback=evaluation["feedback"],
+            strengths=evaluation["strengths"],
+            improvements=evaluation["improvements"],
+            keywords_covered=evaluation["keywords_covered"],
+            keywords_missed=evaluation["keywords_missed"],
+            evaluation_details=evaluation_details,
+        )
+
+    except Exception as e:
+        import traceback
+        print(f"AI follow-up evaluation failed: {e}\n{traceback.format_exc()}")
+        # Fallback: concatenate all candidate answers and use mock evaluation
+        all_answers = " ".join(
+            entry["content"] for entry in conversation_history if entry["role"] == "candidate"
+        )
+        return evaluate_answer_mock(original_question, all_answers, [])
+
+
+@router.post("/evaluate/followup", response_model=EvaluateAnswerResponse)
+async def evaluate_followup(request: EvaluateFollowUpRequest, db: AsyncSession = Depends(get_db)):
+    """Evaluate an entire multi-turn interview conversation."""
+    try:
+        conversation_dicts = [
+            {"role": entry.role, "content": entry.content}
+            for entry in request.conversation_history
+        ]
+
+        evaluation = await evaluate_followup_ai(
+            request.original_question,
+            conversation_dicts,
+            request.openai_api_key,
+        )
+
+        # Concatenate all candidate answers for the record
+        all_answers = "\n---\n".join(
+            entry.content for entry in request.conversation_history if entry.role == "candidate"
+        )
+
+        answer_evaluation = models.AnswerEvaluation(
+            question_id=request.question_id,
+            user_id=int(request.user_id),
+            answer=all_answers,
+            score=evaluation.score,
+            feedback=evaluation.feedback,
+            strengths=evaluation.strengths,
+            improvements=evaluation.improvements,
+            keywords_covered=evaluation.keywords_covered,
+            keywords_missed=evaluation.keywords_missed,
+            evaluation_details=evaluation.evaluation_details.model_dump(),
+        )
+
+        db.add(answer_evaluation)
+        await db.commit()
+        await db.refresh(answer_evaluation)
+
+        return EvaluateAnswerResponse(
+            evaluation_id=str(answer_evaluation.id),
+            score=evaluation.score,
+            feedback=evaluation.feedback,
+            strengths=evaluation.strengths,
+            improvements=evaluation.improvements,
+            keywords_covered=evaluation.keywords_covered,
+            keywords_missed=evaluation.keywords_missed,
+            evaluation_details=evaluation.evaluation_details,
+            created_at=answer_evaluation.created_at or datetime.now(UTC),
+        )
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid user_id: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to evaluate follow-up conversation: {str(e)}",
         )

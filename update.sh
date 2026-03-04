@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="/root/mockmate/app"
+APP_DIR="/root/mockmate"
 CONDA_SH="/root/miniconda3/etc/profile.d/conda.sh"
 NVM_SH="/root/.nvm/nvm.sh"
 

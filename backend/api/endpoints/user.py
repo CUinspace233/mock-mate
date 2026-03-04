@@ -1,25 +1,27 @@
 import hashlib
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from datetime import UTC, datetime, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, desc
-from database import models
+
 from api.deps import get_db
-from datetime import datetime, timedelta, UTC
+from database import models
 from database.schemas import (
-    InterviewRecordCreate,
-    InterviewRecordSaveResponse,
-    UserCreate,
-    UserOut,
-    UserLogin,
-    UserLoginResponse,
     GetInterviewRecordsResponse,
     GetProgressResponse,
-    UserPreferencesOut,
-    UserPreferencesUpdate,
+    InterviewRecordCreate,
     InterviewRecordOut,
+    InterviewRecordSaveResponse,
+    PositionBreakdown,
     ProgressData,
     ProgressStatistics,
-    PositionBreakdown,
+    UserCreate,
+    UserLogin,
+    UserLoginResponse,
+    UserOut,
+    UserPreferencesOut,
+    UserPreferencesUpdate,
 )
 
 router = APIRouter()

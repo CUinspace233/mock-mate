@@ -1,5 +1,6 @@
-import feedparser  # type: ignore
 import asyncio
+
+import feedparser  # type: ignore
 import requests  # type: ignore
 
 

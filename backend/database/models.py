@@ -1,7 +1,8 @@
-from sqlalchemy import Integer, String, Boolean, ForeignKey, Text, JSON, DateTime
-from sqlalchemy.orm import relationship, Mapped, mapped_column, DeclarativeBase
-from datetime import datetime, UTC
 import uuid
+from datetime import UTC, datetime
+
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):

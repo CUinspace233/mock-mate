@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Card,
-  CardContent,
   Typography,
   Button,
   Select,
@@ -17,12 +16,12 @@ import {
   type ColorPaletteProp,
   Input,
   CircularProgress,
+  Divider,
 } from "@mui/joy";
 import {
   Chat as ChatIcon,
   TrendingUp as TrendingUpIcon,
   History as HistoryIcon,
-  Work as WorkIcon,
   Check as CheckIcon,
   Cancel as CancelIcon,
 } from "@mui/icons-material";
@@ -218,293 +217,286 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
     <Sheet
       sx={{
         minHeight: "100vh",
-        backgroundColor: "background.surface",
+        bgcolor: "background.body",
         padding: { xs: 1, sm: 2 },
       }}
     >
-      {/* Header */}
-      <Card variant="soft" sx={{ mb: { xs: 2, sm: 3 } }}>
-        <CardContent>
-          <Stack
-            direction={{ xs: "column", md: "row" }}
-            justifyContent="space-between"
-            alignItems={{ xs: "flex-start", md: "center" }}
-            spacing={{ xs: 2, md: 0 }}
-          >
-            <Box>
-              <Typography
-                level="h3"
-                startDecorator={<WorkIcon />}
-                sx={{
-                  fontSize: { xs: "1.2rem", sm: "1.5rem" },
-                  lineHeight: 1.2,
-                }}
-              >
-                MockMate — Your AI Interview Coach
-              </Typography>
-              <Typography level="body-sm" color="neutral" sx={{ mt: 0.5 }}>
-                Welcome, {username}! Start your interview training journey
-              </Typography>
-            </Box>
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={{ xs: 1, sm: 2 }}
-              alignItems={{ xs: "stretch", sm: "center" }}
-              sx={{ width: { xs: "100%", md: "auto" } }}
-            >
-              <Chip color="primary" variant="soft" sx={{ textAlign: "center" }}>
-                Today's Practice: {dailyQuestionCount} questions
-              </Chip>
-              <Stack direction="row" spacing={1.5} sx={{ width: { xs: "100%", sm: "auto" } }}>
-                <Button
-                  variant="outlined"
-                  size="sm"
-                  onClick={resetDailyProgress}
-                  sx={{ flex: { xs: 1, sm: "none" } }}
-                >
-                  Reset Progress
-                </Button>
-                <Button
-                  variant="soft"
-                  color="danger"
-                  onClick={onLogout}
-                  sx={{ flex: { xs: 1, sm: "none" } }}
-                >
-                  Logout
-                </Button>
-              </Stack>
-            </Stack>
-          </Stack>
-          {/* Daily Trending Question */}
-          <Stack direction={{ xs: "column", lg: "row" }} spacing={{ xs: 2, lg: 3 }} sx={{ mt: 2 }}>
-            {/* Left side spacer or content area for large screens */}
-            <Box sx={{ display: { xs: "none", lg: "block" }, flex: 1 }} />
-            <Stack direction="column" spacing={1} sx={{ mt: 2, width: { xs: "100%", sm: "auto" } }}>
-              <Typography level="body-md">
-                Set your OpenAI API key to start your interview training
-              </Typography>
-              <Stack spacing={1}>
-                <Input
-                  placeholder="OpenAI API key"
-                  value={openaiApiKey}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setOpenaiApiKey(value);
-                    if (value.trim()) {
-                      setApiKeyStatus("checking");
-                    } else {
-                      setApiKeyStatus("idle");
-                    }
-                    validateOpenaiApiKey(value);
-                  }}
-                  type="password"
-                  sx={{ maxWidth: 400 }}
-                  endDecorator={
-                    apiKeyStatus === "valid" ? (
-                      <CheckIcon color="success" />
-                    ) : apiKeyStatus === "invalid" ? (
-                      <CancelIcon color="error" />
-                    ) : apiKeyStatus === "checking" ? (
-                      <CircularProgress size="sm" />
-                    ) : null
-                  }
-                />
-                {apiKeyStatus === "invalid" && (
-                  <Typography level="body-sm" color="danger">
-                    Invalid API key format
-                  </Typography>
-                )}
-                {apiKeyStatus === "checking" && (
-                  <Typography level="body-sm" color="neutral">
-                    Validating API key...
-                  </Typography>
-                )}
-              </Stack>
-            </Stack>
-            <NewsQuestionPush
-              userId={user_id || 0}
-              selectedPosition={selectedPosition}
-              onStartAnswering={(_, newsQuestion) => {
-                // Switch to chat tab and start interview with specific question
-                setActiveTab(0);
-                if (!interviewStarted) {
-                  handleStartInterviewWithNews(newsQuestion);
-                } else {
-                  // If interview is already started, just set the news question
-                  setPendingNewsQuestion(newsQuestion);
-                }
+      <Box sx={{ maxWidth: 1200, mx: "auto" }}>
+        {/* Header Row 1: Brand + Actions */}
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+          sx={{ mb: 1, pt: 0.5 }}
+        >
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography
+              level="title-lg"
+              sx={{
+                fontWeight: 700,
+                fontSize: { xs: "1.1rem", sm: "1.25rem" },
+                background: "linear-gradient(135deg, #2563eb, #172554)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
               }}
-              isInterviewActive={interviewStarted}
-              openaiApiKey={openaiApiKey}
-            />
+            >
+              MockMate
+            </Typography>
+            <Chip color="primary" variant="soft" size="sm">
+              {dailyQuestionCount} today
+            </Chip>
           </Stack>
-        </CardContent>
-      </Card>
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <Button
+              variant="outlined"
+              size="sm"
+              onClick={resetDailyProgress}
+              sx={{ display: { xs: "none", sm: "inline-flex" } }}
+            >
+              Reset
+            </Button>
+            <Button
+              variant="soft"
+              color="danger"
+              size="sm"
+              onClick={onLogout}
+            >
+              Logout
+            </Button>
+          </Stack>
+        </Stack>
 
-      {/* Position Selection */}
-      <Card variant="outlined" sx={{ mb: { xs: 2, sm: 3 } }}>
-        <CardContent>
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center" }}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography level="title-md" noWrap>Position:</Typography>
-              <Select
-                value={selectedPosition}
-                onChange={(_, value) => value && handlePositionChange(value)}
-                sx={{ minWidth: 160 }}
-              >
-                {jobPositions.map((position) => (
-                  <Option key={position.value} value={position.value}>
-                    {position.label}
-                  </Option>
-                ))}
-              </Select>
-            </Stack>
+        {/* Header Row 2: API Key + Trending */}
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="center"
+          sx={{ mb: 1 }}
+        >
+          <Input
+            placeholder="OpenAI API Key"
+            value={openaiApiKey}
+            onChange={(e) => {
+              const value = e.target.value;
+              setOpenaiApiKey(value);
+              if (value.trim()) {
+                setApiKeyStatus("checking");
+              } else {
+                setApiKeyStatus("idle");
+              }
+              validateOpenaiApiKey(value);
+            }}
+            type="password"
+            size="sm"
+            sx={{ flex: 1, maxWidth: { sm: 280 } }}
+            endDecorator={
+              apiKeyStatus === "valid" ? (
+                <CheckIcon color="success" sx={{ fontSize: 16 }} />
+              ) : apiKeyStatus === "invalid" ? (
+                <CancelIcon color="error" sx={{ fontSize: 16 }} />
+              ) : apiKeyStatus === "checking" ? (
+                <CircularProgress size="sm" />
+              ) : null
+            }
+          />
+          <NewsQuestionPush
+            userId={user_id || 0}
+            selectedPosition={selectedPosition}
+            onStartAnswering={(_, newsQuestion) => {
+              setActiveTab(0);
+              if (!interviewStarted) {
+                handleStartInterviewWithNews(newsQuestion);
+              } else {
+                setPendingNewsQuestion(newsQuestion);
+              }
+            }}
+            isInterviewActive={interviewStarted}
+            openaiApiKey={openaiApiKey}
+          />
+        </Stack>
 
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography level="title-md" noWrap>Type:</Typography>
-              <Select
-                value={selectedQuestionType}
-                onChange={(_, value) => value && setSelectedQuestionType(value as QuestionType)}
-                sx={{ minWidth: 140 }}
-              >
-                <Option value={QuestionType.TECHNICAL}>Technical</Option>
-                <Option value={QuestionType.BEHAVIORAL}>Behavioral</Option>
-                <Option value={QuestionType.OPINION}>Opinion</Option>
-              </Select>
-            </Stack>
+        {/* Settings Row */}
+        <Box
+          sx={{
+            mb: 1.5,
+            py: 0.75,
+            px: 1.5,
+            bgcolor: "neutral.50",
+            borderRadius: "lg",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 1,
+            alignItems: "center",
+          }}
+        >
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+            <Typography level="body-xs" sx={{ fontWeight: 700, color: "neutral.500", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.65rem" }}>
+              Position
+            </Typography>
+            <Select variant="plain" value={selectedPosition} onChange={(_, value) => value && handlePositionChange(value)} size="sm" sx={{ minWidth: { xs: 110, md: 140 } }}>
+              {jobPositions.map((position) => (
+                <Option key={position.value} value={position.value}>{position.label}</Option>
+              ))}
+            </Select>
+          </Stack>
 
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography level="title-md" noWrap>Difficulty:</Typography>
-              <Select
-                value={selectedDifficulty}
-                onChange={(_, value) => value && setSelectedDifficulty(value as Difficulty)}
-                color={getDifficultyColor(selectedDifficulty) as ColorPaletteProp}
-                sx={{ minWidth: 110 }}
-              >
-                <Option value={Difficulty.EASY}>
-                  <Chip color="success" variant="soft" size="sm">Easy</Chip>
-                </Option>
-                <Option value={Difficulty.MEDIUM}>
-                  <Chip color="warning" variant="soft" size="sm">Medium</Chip>
-                </Option>
-                <Option value={Difficulty.HARD}>
-                  <Chip color="danger" variant="soft" size="sm">Hard</Chip>
-                </Option>
-              </Select>
-            </Stack>
+          <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
 
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography level="title-md" noWrap>Questions:</Typography>
-              <Select
-                value={questionCountTarget}
-                onChange={(_, value) => value && setQuestionCountTarget(value as number)}
-                sx={{ minWidth: 70 }}
-              >
-                <Option value={3}>3</Option>
-                <Option value={5}>5</Option>
-                <Option value={8}>8</Option>
-                <Option value={10}>10</Option>
-              </Select>
-            </Stack>
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+            <Typography level="body-xs" sx={{ fontWeight: 700, color: "neutral.500", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.65rem" }}>
+              Type
+            </Typography>
+            <Select variant="plain" value={selectedQuestionType} onChange={(_, value) => value && setSelectedQuestionType(value as QuestionType)} size="sm" sx={{ minWidth: { xs: 95, md: 120 } }}>
+              <Option value={QuestionType.TECHNICAL}>Technical</Option>
+              <Option value={QuestionType.BEHAVIORAL}>Behavioral</Option>
+              <Option value={QuestionType.OPINION}>Opinion</Option>
+            </Select>
+          </Stack>
 
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography level="title-md" noWrap>Follow-ups:</Typography>
-              <Select
-                value={followUpLimit}
-                onChange={(_, value) => value !== null && setFollowUpLimit(value as number)}
-                sx={{ minWidth: 80 }}
-              >
-                <Option value={0}>Off</Option>
-                <Option value={1}>1</Option>
-                <Option value={2}>2</Option>
-                <Option value={3}>3</Option>
-                <Option value={4}>4</Option>
-                <Option value={5}>5</Option>
-              </Select>
-            </Stack>
+          <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
 
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography level="title-md" noWrap>Language:</Typography>
-              <Select
-                value={language}
-                onChange={(_, value) => value && setLanguage(value as string)}
-                sx={{ minWidth: 120 }}
-              >
-                <Option value="en">English</Option>
-                <Option value="zh">中文</Option>
-                <Option value="ja">日本語</Option>
-                <Option value="ko">한국어</Option>
-              </Select>
-            </Stack>
-          </Box>
-        </CardContent>
-      </Card>
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+            <Typography level="body-xs" sx={{ fontWeight: 700, color: "neutral.500", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.65rem" }}>
+              <Box component="span" sx={{ display: { xs: "none", md: "inline" } }}>Difficulty</Box>
+              <Box component="span" sx={{ display: { xs: "inline", md: "none" } }}>Diff</Box>
+            </Typography>
+            <Select variant="plain" value={selectedDifficulty} onChange={(_, value) => value && setSelectedDifficulty(value as Difficulty)} color={getDifficultyColor(selectedDifficulty) as ColorPaletteProp} size="sm" sx={{ minWidth: 75 }}>
+              <Option value={Difficulty.EASY}><Chip color="success" variant="soft" size="sm">Easy</Chip></Option>
+              <Option value={Difficulty.MEDIUM}><Chip color="warning" variant="soft" size="sm">Medium</Chip></Option>
+              <Option value={Difficulty.HARD}><Chip color="danger" variant="soft" size="sm">Hard</Chip></Option>
+            </Select>
+          </Stack>
 
-      {/* Main Content Tabs */}
-      <Card variant="outlined">
+          <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
+
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+            <Typography level="body-xs" sx={{ fontWeight: 700, color: "neutral.500", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.65rem" }}>
+              <Box component="span" sx={{ display: { xs: "none", md: "inline" } }}>Questions</Box>
+              <Box component="span" sx={{ display: { xs: "inline", md: "none" } }}>Qty</Box>
+            </Typography>
+            <Select variant="plain" value={questionCountTarget} onChange={(_, value) => value && setQuestionCountTarget(value as number)} size="sm" sx={{ minWidth: 50 }}>
+              <Option value={3}>3</Option>
+              <Option value={5}>5</Option>
+              <Option value={8}>8</Option>
+              <Option value={10}>10</Option>
+            </Select>
+          </Stack>
+
+          <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
+
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+            <Typography level="body-xs" sx={{ fontWeight: 700, color: "neutral.500", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.65rem" }}>
+Follow-ups
+            </Typography>
+            <Select variant="plain" value={followUpLimit} onChange={(_, value) => value !== null && setFollowUpLimit(value as number)} size="sm" sx={{ minWidth: 50 }}>
+              <Option value={0}>Off</Option>
+              <Option value={1}>1</Option>
+              <Option value={2}>2</Option>
+              <Option value={3}>3</Option>
+              <Option value={4}>4</Option>
+              <Option value={5}>5</Option>
+            </Select>
+          </Stack>
+
+          <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
+
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+            <Typography level="body-xs" sx={{ fontWeight: 700, color: "neutral.500", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.65rem" }}>
+              <Box component="span" sx={{ display: { xs: "none", md: "inline" } }}>Language</Box>
+              <Box component="span" sx={{ display: { xs: "inline", md: "none" } }}>Lang</Box>
+            </Typography>
+            <Select variant="plain" value={language} onChange={(_, value) => value && setLanguage(value as string)} size="sm" sx={{ minWidth: 75 }}>
+              <Option value="en">English</Option>
+              <Option value="zh">中文</Option>
+              <Option value="ja">日本語</Option>
+              <Option value="ko">한국어</Option>
+            </Select>
+          </Stack>
+        </Box>
+
+        {/* Main Content Tabs */}
         <Tabs
           value={activeTab}
           onChange={(_, value) => setActiveTab(value as number)}
-          sx={{
-            "& .MuiTabList-root": {
-              overflowX: "auto",
-            },
-          }}
         >
-          <TabList>
-            <Tab sx={{ minWidth: { xs: "auto", sm: "120px" } }}>
-              <ChatIcon sx={{ mr: { xs: 0.5, sm: 1 } }} />
-              <Box sx={{ display: { xs: "none", sm: "block" } }}>Interview Chat</Box>
-              <Box sx={{ display: { xs: "block", sm: "none" } }}>Chat</Box>
+          <TabList
+            sx={{
+              bgcolor: "neutral.100",
+              borderRadius: "lg",
+              p: 0.5,
+              mb: 1,
+              gap: 0.5,
+              overflowX: "auto",
+              flexWrap: "nowrap",
+              scrollbarWidth: "none",
+              "&::-webkit-scrollbar": { display: "none" },
+              "& .MuiTab-root": {
+                borderRadius: "md",
+                fontWeight: 600,
+                flex: { xs: "1 0 auto", sm: "none" },
+                whiteSpace: "nowrap",
+                "&[aria-selected='true']": {
+                  bgcolor: "background.surface",
+                  boxShadow: "sm",
+                },
+              },
+            }}
+          >
+            <Tab>
+              <ChatIcon sx={{ mr: 0.5, fontSize: { xs: 18, sm: 20 } }} />
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Interview </Box>
+              Chat
             </Tab>
-            <Tab sx={{ minWidth: { xs: "auto", sm: "120px" } }}>
-              <HistoryIcon sx={{ mr: { xs: 0.5, sm: 1 } }} />
-              <Box sx={{ display: { xs: "none", sm: "block" } }}>History</Box>
-              <Box sx={{ display: { xs: "block", sm: "none" } }}>History</Box>
+            <Tab>
+              <HistoryIcon sx={{ mr: 0.5, fontSize: { xs: 18, sm: 20 } }} />
+              History
             </Tab>
-            <Tab sx={{ minWidth: { xs: "auto", sm: "120px" } }}>
-              <TrendingUpIcon sx={{ mr: { xs: 0.5, sm: 1 } }} />
-              <Box sx={{ display: { xs: "none", sm: "block" } }}>Progress Trend</Box>
-              <Box sx={{ display: { xs: "block", sm: "none" } }}>Progress</Box>
+            <Tab>
+              <TrendingUpIcon sx={{ mr: 0.5, fontSize: { xs: 18, sm: 20 } }} />
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Progress </Box>
+              <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>Stats</Box>
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Trend</Box>
             </Tab>
           </TabList>
 
-          <TabPanel value={0} sx={{ p: 0 }}>
-            <InterviewChat
-              selectedPosition={selectedPosition}
-              selectedDifficulty={selectedDifficulty}
-              user_id={user_id || 0}
-              interviewStarted={interviewStarted}
-              sessionId={sessionId}
-              onInterviewComplete={handleInterviewComplete}
-              onInterviewStart={handleStartInterview}
-              messages={messages}
-              setMessages={setMessages}
-              currentQuestion={currentQuestion}
-              setCurrentQuestion={setCurrentQuestion}
-              awaitingAnswer={awaitingAnswer}
-              setAwaitingAnswer={setAwaitingAnswer}
-              presetQuestion={pendingNewsQuestion}
-              onPresetQuestionUsed={handleNewsQuestionUsed}
-              questionType={selectedQuestionType}
-              openaiApiKey={openaiApiKey}
-              questionCountTarget={questionCountTarget}
-              currentQuestionNumber={currentQuestionNumber}
-              onQuestionNumberIncrement={handleQuestionNumberIncrement}
-              followUpLimit={followUpLimit}
-              language={language}
-            />
-          </TabPanel>
+          <Card variant="outlined" sx={{ boxShadow: "sm" }}>
+            <TabPanel value={0} sx={{ p: 0 }}>
+              <InterviewChat
+                selectedPosition={selectedPosition}
+                selectedDifficulty={selectedDifficulty}
+                user_id={user_id || 0}
+                interviewStarted={interviewStarted}
+                sessionId={sessionId}
+                onInterviewComplete={handleInterviewComplete}
+                onInterviewStart={handleStartInterview}
+                messages={messages}
+                setMessages={setMessages}
+                currentQuestion={currentQuestion}
+                setCurrentQuestion={setCurrentQuestion}
+                awaitingAnswer={awaitingAnswer}
+                setAwaitingAnswer={setAwaitingAnswer}
+                presetQuestion={pendingNewsQuestion}
+                onPresetQuestionUsed={handleNewsQuestionUsed}
+                questionType={selectedQuestionType}
+                openaiApiKey={openaiApiKey}
+                questionCountTarget={questionCountTarget}
+                currentQuestionNumber={currentQuestionNumber}
+                onQuestionNumberIncrement={handleQuestionNumberIncrement}
+                followUpLimit={followUpLimit}
+                language={language}
+              />
+            </TabPanel>
 
-          <TabPanel value={1} sx={{ p: 0 }}>
-            <InterviewHistory selectedPosition={selectedPosition} />
-          </TabPanel>
+            <TabPanel value={1} sx={{ p: 0 }}>
+              <InterviewHistory selectedPosition={selectedPosition} />
+            </TabPanel>
 
-          <TabPanel value={2} sx={{ p: 0 }}>
-            <ProgressChart userId={user_id || 0} selectedPosition={selectedPosition} />
-          </TabPanel>
+            <TabPanel value={2} sx={{ p: 0 }}>
+              <ProgressChart userId={user_id || 0} selectedPosition={selectedPosition} />
+            </TabPanel>
+          </Card>
         </Tabs>
-      </Card>
+      </Box>
     </Sheet>
   );
 }

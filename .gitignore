@@ -2,3 +2,6 @@
 .vscode
 .mypy_cache/
 .env
+
+.agents
+.claude

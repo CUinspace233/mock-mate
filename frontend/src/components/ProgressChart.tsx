@@ -71,6 +71,14 @@ export default function ProgressChart({ userId, selectedPosition }: ProgressChar
     return "neutral";
   };
 
+  const statCardSx = (accentColor: string, delay: number) => ({
+    flex: 1,
+    borderLeft: "4px solid",
+    borderLeftColor: accentColor,
+    boxShadow: "sm",
+    animation: `slideUp 0.4s ease-out ${delay * 0.1}s both`,
+  });
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
@@ -115,33 +123,31 @@ export default function ProgressChart({ userId, selectedPosition }: ProgressChar
       {!loading && !error && statistics && statistics.total_questions > 0 && (
         <>
           {/* Statistics Cards */}
-          <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-            <Card variant="soft" color="primary" sx={{ flex: 1 }}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 4 }}>
+            <Card sx={statCardSx("primary.500", 0)}>
               <CardContent>
-                <Typography level="body-sm" color="primary">
+                <Typography level="body-xs" sx={{ color: "neutral.500", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   Total Questions
                 </Typography>
                 <Typography level="h3">{statistics.total_questions}</Typography>
               </CardContent>
             </Card>
 
-            <Card variant="soft" color="success" sx={{ flex: 1 }}>
+            <Card sx={statCardSx("success.500", 1)}>
               <CardContent>
-                <Typography level="body-sm" color="success">
+                <Typography level="body-xs" sx={{ color: "neutral.500", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   Average Score
                 </Typography>
                 <Typography level="h3">{Math.round(statistics.average_score)}</Typography>
               </CardContent>
             </Card>
 
-            <Card
-              variant="soft"
-              color={getImprovementColor(statistics.improvement_rate)}
-              sx={{ flex: 1 }}
-            >
+            <Card sx={statCardSx(getImprovementColor(statistics.improvement_rate) === "success" ? "success.500" : getImprovementColor(statistics.improvement_rate) === "danger" ? "danger.500" : "neutral.500", 2)}>
               <CardContent>
                 <Stack direction="row" alignItems="center" spacing={1}>
-                  <Typography level="body-sm">Improvement</Typography>
+                  <Typography level="body-xs" sx={{ color: "neutral.500", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Improvement
+                  </Typography>
                   {getImprovementIcon(statistics.improvement_rate)}
                 </Stack>
                 <Typography level="h3">
@@ -151,9 +157,9 @@ export default function ProgressChart({ userId, selectedPosition }: ProgressChar
               </CardContent>
             </Card>
 
-            <Card variant="soft" color="warning" sx={{ flex: 1 }}>
+            <Card sx={statCardSx("warning.500", 3)}>
               <CardContent>
-                <Typography level="body-sm" color="warning">
+                <Typography level="body-xs" sx={{ color: "neutral.500", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   Current Streak
                 </Typography>
                 <Typography level="h3">{statistics.current_streak} Days</Typography>
@@ -162,10 +168,10 @@ export default function ProgressChart({ userId, selectedPosition }: ProgressChar
           </Stack>
 
           {/* Additional Statistics Row */}
-          <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-            <Card variant="outlined" sx={{ flex: 1 }}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 4 }}>
+            <Card variant="outlined" sx={{ flex: 1, boxShadow: "sm" }}>
               <CardContent>
-                <Typography level="body-sm" color="success">
+                <Typography level="body-xs" sx={{ color: "neutral.500", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   Best Score
                 </Typography>
                 <Chip color="success" size="lg">
@@ -174,9 +180,9 @@ export default function ProgressChart({ userId, selectedPosition }: ProgressChar
               </CardContent>
             </Card>
 
-            <Card variant="outlined" sx={{ flex: 1 }}>
+            <Card variant="outlined" sx={{ flex: 1, boxShadow: "sm" }}>
               <CardContent>
-                <Typography level="body-sm" color="danger">
+                <Typography level="body-xs" sx={{ color: "neutral.500", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   Lowest Score
                 </Typography>
                 <Chip color="danger" size="lg">
@@ -185,9 +191,9 @@ export default function ProgressChart({ userId, selectedPosition }: ProgressChar
               </CardContent>
             </Card>
 
-            <Card variant="outlined" sx={{ flex: 1 }}>
+            <Card variant="outlined" sx={{ flex: 1, boxShadow: "sm" }}>
               <CardContent>
-                <Typography level="body-sm" color="primary">
+                <Typography level="body-xs" sx={{ color: "neutral.500", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   Practice Time
                 </Typography>
                 <Chip color="primary" size="lg">
@@ -196,9 +202,9 @@ export default function ProgressChart({ userId, selectedPosition }: ProgressChar
               </CardContent>
             </Card>
 
-            <Card variant="outlined" sx={{ flex: 1 }}>
+            <Card variant="outlined" sx={{ flex: 1, boxShadow: "sm" }}>
               <CardContent>
-                <Typography level="body-sm" color="neutral">
+                <Typography level="body-xs" sx={{ color: "neutral.500", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   Score Range
                 </Typography>
                 <Chip color="neutral" size="lg">
@@ -210,7 +216,7 @@ export default function ProgressChart({ userId, selectedPosition }: ProgressChar
 
           {/* Position Breakdown (if multiple positions) */}
           {positionBreakdown.length > 1 && (
-            <Card variant="outlined" sx={{ mb: 4 }}>
+            <Card variant="outlined" sx={{ mb: 4, boxShadow: "sm" }}>
               <CardContent>
                 <Typography level="title-md" sx={{ mb: 2 }}>
                   Position Breakdown
@@ -218,7 +224,7 @@ export default function ProgressChart({ userId, selectedPosition }: ProgressChar
                 <Stack direction="row" spacing={2} flexWrap="wrap">
                   {positionBreakdown.map((breakdown) => (
                     <Box key={breakdown.position} sx={{ minWidth: 150 }}>
-                      <Typography level="body-sm" color="neutral">
+                      <Typography level="body-sm" sx={{ color: "neutral.500" }}>
                         {PositionLabels[breakdown.position as PositionKey] || breakdown.position}
                       </Typography>
                       <Stack direction="row" spacing={1} alignItems="center">
@@ -237,8 +243,8 @@ export default function ProgressChart({ userId, selectedPosition }: ProgressChar
           )}
 
           {/* Daily Progress Chart */}
-          <Card variant="outlined">
-            <CardContent>
+          <Card variant="outlined" sx={{ boxShadow: "sm" }}>
+            <CardContent sx={{ p: 3 }}>
               <Typography level="title-md" sx={{ mb: 3 }}>
                 Daily Performance Trend
               </Typography>
@@ -257,7 +263,7 @@ export default function ProgressChart({ userId, selectedPosition }: ProgressChar
                     {
                       dataKey: "score",
                       label: "Average Score",
-                      color: "#1976d2",
+                      color: "#2563eb",
                     },
                   ]}
                   height={300}

@@ -2,16 +2,14 @@ import { useState } from "react";
 import { register } from "../api/api";
 import {
   Box,
-  Card,
-  CardContent,
   Typography,
   FormControl,
   FormLabel,
   Input,
   Button,
   Alert,
-  Sheet,
 } from "@mui/joy";
+import AuthLayout from "./AuthLayout";
 
 interface RegisterPageProps {
   onRegisterSuccess: (username: string) => void;
@@ -69,113 +67,123 @@ export default function RegisterPage({ onRegisterSuccess, onSwitchToLogin }: Reg
   };
 
   return (
-    <Sheet
-      sx={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 2,
-      }}
-    >
-      <Card
-        variant="outlined"
+    <AuthLayout>
+      <Box
         sx={{
-          width: 400,
-          boxShadow: "lg",
-          borderRadius: "lg",
+          width: { xs: "100%", sm: 380 },
+          maxWidth: 380,
+          animation: "scaleIn 0.5s ease-out",
         }}
       >
-        <CardContent sx={{ gap: 2 }}>
-          <Box sx={{ textAlign: "center", mb: 3 }}>
-            <Typography level="h2" component="h1">
-              Create Account
-            </Typography>
-            <Typography level="body-sm" color="neutral">
-              Join us today! Create your new account
-            </Typography>
-          </Box>
+        {/* Brand header — only visible on mobile */}
+        <Box sx={{ display: { xs: "block", md: "none" }, textAlign: "center", mb: 4 }}>
+          <Typography
+            level="h2"
+            component="h1"
+            sx={{
+              fontSize: "2rem",
+              fontWeight: 700,
+              background: "linear-gradient(135deg, #2563eb, #172554)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            MockMate
+          </Typography>
+          <Typography level="body-sm" sx={{ color: "neutral.500" }}>
+            Your AI Interview Coach
+          </Typography>
+        </Box>
 
-          {error && (
-            <Alert color="danger" variant="soft" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
+        {/* Desktop heading */}
+        <Box sx={{ display: { xs: "none", md: "block" }, mb: 4 }}>
+          <Typography level="h3" sx={{ fontWeight: 700, color: "neutral.800" }}>
+            Create your account
+          </Typography>
+          <Typography level="body-sm" sx={{ color: "neutral.500", mt: 0.5 }}>
+            Start practicing for your next interview
+          </Typography>
+        </Box>
 
-          {success && (
-            <Alert color="success" variant="soft" sx={{ mb: 2 }}>
-              {success}
-            </Alert>
-          )}
+        {error && (
+          <Alert color="danger" variant="soft" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
 
-          <form onSubmit={handleSubmit}>
-            <FormControl sx={{ mb: 2 }}>
-              <FormLabel>Username</FormLabel>
-              <Input
-                placeholder="Choose a username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                size="lg"
-              />
-            </FormControl>
+        {success && (
+          <Alert color="success" variant="soft" sx={{ mb: 2 }}>
+            {success}
+          </Alert>
+        )}
 
-            <FormControl sx={{ mb: 2 }}>
-              <FormLabel>Email</FormLabel>
-              <Input
-                type="email"
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                size="lg"
-              />
-            </FormControl>
+        <form onSubmit={handleSubmit}>
+          <FormControl sx={{ mb: 2 }}>
+            <FormLabel>Username</FormLabel>
+            <Input
+              placeholder="Choose a username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              size="lg"
+            />
+          </FormControl>
 
-            <FormControl sx={{ mb: 2 }}>
-              <FormLabel>Password</FormLabel>
-              <Input
-                type="password"
-                placeholder="Create a password (min. 6 characters)"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                size="lg"
-              />
-            </FormControl>
+          <FormControl sx={{ mb: 2 }}>
+            <FormLabel>Email</FormLabel>
+            <Input
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              size="lg"
+            />
+          </FormControl>
 
-            <FormControl sx={{ mb: 3 }}>
-              <FormLabel>Confirm Password</FormLabel>
-              <Input
-                type="password"
-                placeholder="Confirm your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                size="lg"
-              />
-            </FormControl>
+          <FormControl sx={{ mb: 2 }}>
+            <FormLabel>Password</FormLabel>
+            <Input
+              type="password"
+              placeholder="Create a password (min. 6 characters)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              size="lg"
+            />
+          </FormControl>
 
-            <Button type="submit" fullWidth size="lg" loading={loading} sx={{ mb: 2 }}>
-              Create Account
+          <FormControl sx={{ mb: 3 }}>
+            <FormLabel>Confirm Password</FormLabel>
+            <Input
+              type="password"
+              placeholder="Confirm your password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              size="lg"
+            />
+          </FormControl>
+
+          <Button type="submit" fullWidth size="lg" loading={loading} sx={{ mb: 2 }}>
+            Create Account
+          </Button>
+        </form>
+
+        <Box sx={{ textAlign: "center" }}>
+          <Typography level="body-sm" sx={{ color: "neutral.500" }}>
+            Already have an account?{" "}
+            <Button
+              variant="plain"
+              size="sm"
+              onClick={onSwitchToLogin}
+              sx={{ p: 1, fontWeight: "bold" }}
+            >
+              Log in here
             </Button>
-          </form>
-
-          <Box sx={{ textAlign: "center" }}>
-            <Typography level="body-sm" color="neutral">
-              Already have an account?{" "}
-              <Button
-                variant="plain"
-                size="sm"
-                onClick={onSwitchToLogin}
-                sx={{ p: 1, fontWeight: "bold" }}
-              >
-                Log in here
-              </Button>
-            </Typography>
-          </Box>
-        </CardContent>
-      </Card>
-    </Sheet>
+          </Typography>
+        </Box>
+      </Box>
+    </AuthLayout>
   );
 }

@@ -10,7 +10,6 @@ import {
   Avatar,
   Chip,
   Alert,
-  CircularProgress,
   Divider,
   Modal,
   ModalDialog,
@@ -19,7 +18,7 @@ import {
 import {
   Send as SendIcon,
   Person as PersonIcon,
-  SmartToy as RobotIcon,
+  PlayArrow as PlayArrowIcon,
   Refresh as RefreshIcon,
   CheckCircle as CheckIcon,
   Cancel as CancelIcon,
@@ -623,30 +622,74 @@ export default function InterviewChat({
 
   if (!interviewStarted && messages.length === 0) {
     return (
-      <Box sx={{ p: 3, textAlign: "center" }}>
-        <Typography level="h4" sx={{ mb: 2 }}>
-          Ready to Start Interview Practice
+      <Box
+        sx={{
+          py: { xs: 6, sm: 8 },
+          px: { xs: 3, sm: 4 },
+          textAlign: "center",
+          animation: "slideUp 0.5s ease-out",
+        }}
+      >
+        <Box
+          sx={{
+            width: { xs: 72, sm: 96 },
+            height: { xs: 72, sm: 96 },
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, rgba(37,99,235,0.12), rgba(23,37,84,0.08))",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            mx: "auto",
+            mb: 3,
+          }}
+        >
+          <Box component="img" src="/robot_icon.png" alt="AI" sx={{ width: { xs: 32, sm: 44 }, height: { xs: 32, sm: 44 } }} />
+        </Box>
+        <Typography
+          level="h3"
+          sx={{
+            mb: 1.5,
+            fontWeight: 700,
+            background: "linear-gradient(135deg, #2563eb, #172554)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          Ready When You Are
         </Typography>
-        <Typography level="body-lg" color="neutral" sx={{ mb: 3 }}>
-          After selecting your target position and difficulty,
-          <br />
-          click 'Get Interview Questions' to receive AI-generated interview questions.
+        <Typography level="body-md" sx={{ color: "neutral.500", mb: 1, maxWidth: 560, mx: "auto", lineHeight: 1.7 }}>
+          Configure your position, difficulty, and question type above,
+          then start a mock interview session with AI-powered questions.
+        </Typography>
+        <Typography level="body-sm" sx={{ color: "neutral.400", mb: 4 }}>
+          Real-time feedback and scoring after each answer
         </Typography>
         <Button
           size="lg"
-          startDecorator={isLoading ? undefined : <RobotIcon />}
+          startDecorator={isLoading ? undefined : <PlayArrowIcon />}
           onClick={handleStartNewQuestion}
           loading={isLoading}
           disabled={isLoading}
+          sx={{
+            px: 5,
+            py: 1.5,
+            fontSize: "1rem",
+            background: "linear-gradient(135deg, #2563eb, #1e40af)",
+            boxShadow: "0 4px 14px rgba(37,99,235,0.35)",
+            "&:hover": {
+              background: "linear-gradient(135deg, #1d4ed8, #1e3a8a)",
+              boxShadow: "0 6px 20px rgba(37,99,235,0.4)",
+            },
+          }}
         >
-          {isLoading ? "Generating Questions..." : "Get Interview Questions"}
+          {isLoading ? "Generating..." : "Start Interview"}
         </Button>
       </Box>
     );
   }
 
   return (
-    <Box sx={{ height: "600px", display: "flex", flexDirection: "column" }}>
+    <Box sx={{ height: { xs: "calc(100vh - 220px)", sm: "600px" }, display: "flex", flexDirection: "column" }}>
       {/* Question Progress */}
       {currentQuestionNumber > 0 && (
         <Box sx={{ px: 2, pt: 1.5, display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
@@ -696,27 +739,30 @@ export default function InterviewChat({
             sx={{
               alignItems: "flex-start",
               justifyContent: message.sender === "user" ? "flex-end" : "flex-start",
+              animation: "fadeIn 0.3s ease-out",
             }}
           >
             {message.sender === "ai" && (
-              <Avatar size="sm" color="primary">
-                <RobotIcon />
+              <Avatar size="sm" sx={{ bgcolor: "primary.100", color: "primary.600" }}>
+                <Box component="img" src="/robot_icon.png" alt="AI" sx={{ width: 24, height: 24 }} />
               </Avatar>
             )}
 
             <Card
               variant={message.sender === "user" ? "soft" : "outlined"}
-              color={message.sender === "user" ? "primary" : "neutral"}
               sx={{
-                maxWidth: "70%",
+                maxWidth: { xs: "85%", sm: "70%" },
+                boxShadow: "xs",
                 ...(message.sender === "user" && {
                   order: -1,
-                  bgcolor: "primary.100",
+                  bgcolor: "primary.50",
                   borderColor: "primary.200",
+                  borderRadius: "16px 16px 4px 16px",
                 }),
                 ...(message.sender === "ai" && {
                   bgcolor: "background.surface",
                   borderColor: "neutral.200",
+                  borderRadius: "16px 16px 16px 4px",
                 }),
               }}
             >
@@ -743,14 +789,14 @@ export default function InterviewChat({
                     </Chip>
                   </Box>
                 )}
-                <Typography level="body-xs" color="neutral" sx={{ mt: 1 }}>
+                <Typography level="body-xs" sx={{ color: "neutral.400", mt: 1 }}>
                   {message.timestamp.toLocaleTimeString()}
                 </Typography>
               </CardContent>
             </Card>
 
             {message.sender === "user" && (
-              <Avatar size="sm" color="neutral">
+              <Avatar size="sm" sx={{ bgcolor: "neutral.200", color: "neutral.600" }}>
                 <PersonIcon />
               </Avatar>
             )}
@@ -758,17 +804,26 @@ export default function InterviewChat({
         ))}
 
         {isLoading && (
-          <Stack direction="row" spacing={2} alignItems="center">
-            <Avatar size="sm" color="primary">
-              <RobotIcon />
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ animation: "fadeIn 0.3s ease-out" }}>
+            <Avatar size="sm" sx={{ bgcolor: "primary.100", color: "primary.600" }}>
+              <Box component="img" src="/robot_icon.png" alt="AI" sx={{ width: 24, height: 24 }} />
             </Avatar>
-            <Card variant="soft">
+            <Card variant="soft" sx={{ borderRadius: "16px 16px 16px 4px" }}>
               <CardContent sx={{ p: 2 }}>
-                <Stack direction="row" spacing={2} alignItems="center">
-                  <CircularProgress size="sm" />
-                  <Typography level="body-sm" color="neutral">
-                    MockMate is thinking...
-                  </Typography>
+                <Stack direction="row" spacing={0.75} alignItems="center">
+                  {[0, 1, 2].map((i) => (
+                    <Box
+                      key={i}
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        bgcolor: "primary.400",
+                        animation: "dotPulse 1.4s ease-in-out infinite",
+                        animationDelay: `${i * 0.2}s`,
+                      }}
+                    />
+                  ))}
                 </Stack>
               </CardContent>
             </Card>
@@ -781,41 +836,32 @@ export default function InterviewChat({
       <Divider />
 
       {/* Input Area */}
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ p: { xs: 1.5, sm: 2 }, bgcolor: "neutral.50" }}>
         {awaitingAnswer && currentQuestion ? (
-          <Stack spacing={2}>
+          <Stack spacing={1.5}>
             {showAlert && (
-              <Alert color="primary" variant="soft">
-                Please answer the question above, then click the send button to submit your answer.
+              <Alert color="primary" variant="soft" size="sm">
+                Answer the question above, then send your response.
               </Alert>
             )}
-            <Stack direction="row" spacing={2}>
-              <Textarea
-                placeholder="Enter your answer here..."
-                value={currentAnswer}
-                onChange={(e) => setCurrentAnswer(e.target.value)}
-                minRows={3}
-                maxRows={10}
-                sx={{ flex: 1 }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                    handleSendAnswer();
-                  }
-                }}
-              />
-              <Stack spacing={1}>
-                <Button
-                  startDecorator={<SendIcon />}
-                  onClick={handleSendAnswer}
-                  disabled={!currentAnswer.trim() || isLoading}
-                  color="primary"
-                >
-                  Send Answer
-                </Button>
-
-                <Typography level="body-xs" color="neutral">
-                  Ctrl/Cmd+Enter to send
-                </Typography>
+            <Textarea
+              placeholder="Enter your answer here..."
+              value={currentAnswer}
+              onChange={(e) => setCurrentAnswer(e.target.value)}
+              minRows={2}
+              maxRows={8}
+              sx={{ width: "100%" }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                  handleSendAnswer();
+                }
+              }}
+            />
+            <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
+              <Typography level="body-xs" sx={{ color: "neutral.400", display: { xs: "none", sm: "block" } }}>
+                Ctrl/Cmd+Enter to send
+              </Typography>
+              <Stack direction="row" spacing={1}>
                 <Button
                   startDecorator={<ExitIcon />}
                   onClick={handleEndSession}
@@ -823,30 +869,41 @@ export default function InterviewChat({
                   color="danger"
                   size="sm"
                 >
-                  End Session
+                  End
+                </Button>
+                <Button
+                  startDecorator={<SendIcon />}
+                  onClick={handleSendAnswer}
+                  disabled={!currentAnswer.trim() || isLoading}
+                  color="primary"
+                  size="sm"
+                >
+                  Send
                 </Button>
               </Stack>
             </Stack>
           </Stack>
         ) : (
-          <Stack direction="row" spacing={2} justifyContent="center">
+          <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap">
             <Button
               startDecorator={<RefreshIcon />}
               onClick={handleStartNewQuestion}
               disabled={isLoading}
               variant="outlined"
+              size="sm"
             >
-              Get New Question
+              New Question
             </Button>
             <Button
               startDecorator={isCompletingInterview ? undefined : <CheckIcon />}
               onClick={handleCompleteInterview}
               color="success"
               variant="soft"
+              size="sm"
               loading={isCompletingInterview}
               disabled={isCompletingInterview}
             >
-              {isCompletingInterview ? "Completing..." : "Complete This Session"}
+              {isCompletingInterview ? "Completing..." : "Complete Session"}
             </Button>
           </Stack>
         )}

@@ -67,7 +67,7 @@ class UserLoginResponse(BaseModel):
 # Question
 class QuestionBase(BaseModel):
     content: str
-    position: Position
+    position: str
     difficulty: Difficulty | None = Difficulty.MEDIUM
     question_type: QuestionType | None = QuestionType.TECHNICAL
     expected_keywords: list[str] = []
@@ -86,7 +86,7 @@ class QuestionOut(QuestionBase):
 
 
 class GenerateQuestionRequest(BaseModel):
-    position: Position
+    position: str
     difficulty: Difficulty | None = Difficulty.MEDIUM
     question_type: QuestionType | None = QuestionType.TECHNICAL
     user_id: int
@@ -180,7 +180,7 @@ class EvaluateAnswerResponse(BaseModel):
 # Interview Session
 class StartSessionRequest(BaseModel):
     user_id: int
-    position: Position
+    position: str
     session_type: SessionType | None = SessionType.PRACTICE
 
 
@@ -228,7 +228,7 @@ class InterviewRecordBase(BaseModel):
     answer: str
     score: int
     feedback: str
-    position: Position
+    position: str
 
 
 class InterviewRecordCreate(InterviewRecordBase):
@@ -298,7 +298,7 @@ class NotificationSettings(BaseModel):
 
 
 class UserPreferencesBase(BaseModel):
-    preferred_position: Position | None = Position.FRONTEND
+    preferred_position: str | None = "frontend"
     difficulty_level: Difficulty | None = Difficulty.MEDIUM
     daily_question_goal: int | None = 5
     notification_settings: NotificationSettings | None = NotificationSettings()
@@ -450,7 +450,7 @@ class FetchNewsResponse(BaseModel):
 
 
 class GetTrendingQuestionsRequest(BaseModel):
-    position: Position | None = None
+    position: str | None = None
     category: NewsCategory | None = None
     limit: int = 5
     days_back: int = 7  # How many days back to look for news

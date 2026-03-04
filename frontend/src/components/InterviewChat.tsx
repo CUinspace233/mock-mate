@@ -36,7 +36,6 @@ import {
   type EvaluateAnswerResponse,
   type GenerateQuestionRequest,
   type ConversationEntry,
-  type PositionKey,
   Difficulty,
   type Message,
   type NewsQuestion,
@@ -133,7 +132,7 @@ export default function InterviewChat({
 
     try {
       const req: GenerateQuestionRequest = {
-        position: selectedPosition as PositionKey,
+        position: selectedPosition,
         difficulty: selectedDifficulty,
         question_type: questionType,
         user_id: user_id,
@@ -211,7 +210,7 @@ export default function InterviewChat({
       // Fallback to non-streaming API
       try {
         const req: GenerateQuestionRequest = {
-          position: selectedPosition as PositionKey,
+          position: selectedPosition,
           difficulty: selectedDifficulty,
           question_type: questionType,
           user_id: user_id,
@@ -425,7 +424,7 @@ export default function InterviewChat({
       answer: allAnswers,
       score: evaluationMessage.score || 0,
       feedback: evaluationContent,
-      position: (presetQuestion?.position as PositionKey) || (selectedPosition as PositionKey),
+      position: presetQuestion?.position || selectedPosition,
       session_id: sessionId || null,
       question_id: questionId,
       user_id: user_id,

@@ -30,7 +30,7 @@ async def start_session(request: StartSessionRequest, db: AsyncSession = Depends
 
         session = models.InterviewSession(
             user_id=int(request.user_id),
-            position=request.position.value,
+            position=request.position,
             session_type=request.session_type.value if request.session_type else "practice",
         )
 

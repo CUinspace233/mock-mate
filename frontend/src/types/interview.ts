@@ -45,7 +45,7 @@ export interface Message {
 }
 
 export interface GenerateQuestionRequest {
-  position: PositionKey;
+  position: string;
   difficulty: Difficulty | null;
   question_type: QuestionType;
   user_id: number;
@@ -130,7 +130,7 @@ export interface InterviewRecord {
   answer: string;
   score: number;
   feedback: string;
-  position: PositionKey;
+  position: string;
   session_id: string | null;
   question_id: string;
   user_id: number;
@@ -151,7 +151,7 @@ export interface GetInterviewRecordsResponse {
 
 export interface StartSessionRequest {
   user_id: number;
-  position: PositionKey;
+  position: string;
   session_type?: SessionType;
 }
 

@@ -66,13 +66,18 @@ export default function NewsQuestionCard({
 
   return (
     <Card
-      variant="outlined"
       sx={{
         boxShadow: "lg",
-        border: "1px solid",
-        borderColor: "primary.200",
+        border: "none",
         maxWidth: 480,
         position: "relative",
+        overflow: "hidden",
+        "&::before": {
+          content: '""',
+          display: "block",
+          height: "4px",
+          background: "linear-gradient(90deg, #2563eb, #172554)",
+        },
       }}
     >
       {/* Close button */}
@@ -83,7 +88,7 @@ export default function NewsQuestionCard({
           onClick={onClose}
           sx={{
             position: "absolute",
-            top: 8,
+            top: 12,
             right: 8,
             zIndex: 1,
           }}
@@ -96,8 +101,8 @@ export default function NewsQuestionCard({
         {/* Header */}
         <Box sx={{ mb: 2 }}>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-            <Newspaper color="primary" />
-            <Typography level="title-md" color="primary">
+            <Newspaper sx={{ color: "primary.500" }} />
+            <Typography level="title-md" sx={{ color: "primary.600" }}>
               Today's Interview Challenge
             </Typography>
           </Stack>
@@ -117,10 +122,10 @@ export default function NewsQuestionCard({
         </Box>
 
         {/* News Source */}
-        <Sheet variant="soft" sx={{ p: 2, mb: 2, borderRadius: "sm" }}>
+        <Sheet variant="soft" sx={{ p: 2, mb: 2, borderRadius: "md" }}>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
             <AccessTime sx={{ fontSize: "0.875rem" }} />
-            <Typography level="body-sm" color="neutral">
+            <Typography level="body-sm" sx={{ color: "neutral.500" }}>
               {formatRelativeTime(question.published_at)}
             </Typography>
           </Stack>
@@ -144,13 +149,13 @@ export default function NewsQuestionCard({
 
           {/* Relevance Score */}
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
-            <Typography level="body-xs" color="neutral">
+            <Typography level="body-xs" sx={{ color: "neutral.500" }}>
               Relevance:
             </Typography>
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.25 }}>
               {renderStarRating(question.relevance_score)}
             </Box>
-            <Typography level="body-xs" color="neutral">
+            <Typography level="body-xs" sx={{ color: "neutral.500" }}>
               ({(question.relevance_score * 100).toFixed(0)}%)
             </Typography>
           </Stack>
@@ -179,8 +184,8 @@ export default function NewsQuestionCard({
 
         {/* AI Reasoning */}
         {isExpanded && question.ai_reasoning && (
-          <Sheet variant="soft" color="neutral" sx={{ p: 2, mb: 2, borderRadius: "sm" }}>
-            <Typography level="body-sm" color="neutral" sx={{ fontStyle: "italic" }}>
+          <Sheet variant="soft" color="neutral" sx={{ p: 2, mb: 2, borderRadius: "md" }}>
+            <Typography level="body-sm" sx={{ color: "neutral.600", fontStyle: "italic" }}>
               <strong>AI Analysis:</strong>
               {question.ai_reasoning}
             </Typography>

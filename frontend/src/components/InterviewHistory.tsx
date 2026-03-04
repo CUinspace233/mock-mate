@@ -10,7 +10,7 @@ import {
   Select,
   Option,
   Stack,
-  Alert,
+  IconButton,
 } from "@mui/joy";
 import {
   Visibility as ViewIcon,
@@ -18,6 +18,7 @@ import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
   Remove as RemoveIcon,
+  Inbox as InboxIcon,
 } from "@mui/icons-material";
 import { type InterviewRecord, PositionLabels, type PositionKey } from "../types/interview";
 import { getInterviewRecords } from "../api/api";
@@ -123,36 +124,42 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
     return Math.round(recentAvg - olderAvg);
   };
 
+  const statCardSx = (accentColor: string, delay: number) => ({
+    flex: 1,
+    borderLeft: `4px solid`,
+    borderLeftColor: accentColor,
+    boxShadow: "sm",
+    animation: `slideUp 0.4s ease-out ${delay * 0.1}s both`,
+  });
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Statistics Cards */}
-      <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
-        <Card variant="soft" color="primary" sx={{ flex: 1 }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 3 }}>
+        <Card sx={statCardSx("primary.500", 0)}>
           <CardContent>
-            <Typography level="body-sm" color="primary">
+            <Typography level="body-xs" sx={{ color: "neutral.500", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
               Total Practice Sessions
             </Typography>
             <Typography level="h3">{filteredRecords.length}</Typography>
           </CardContent>
         </Card>
 
-        <Card variant="soft" color="success" sx={{ flex: 1 }}>
+        <Card sx={statCardSx("success.500", 1)}>
           <CardContent>
-            <Typography level="body-sm" color="success">
+            <Typography level="body-xs" sx={{ color: "neutral.500", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
               Average Score
             </Typography>
             <Typography level="h3">{calculateAverageScore()}</Typography>
           </CardContent>
         </Card>
 
-        <Card
-          variant="soft"
-          color={calculateImprovement() >= 0 ? "success" : "danger"}
-          sx={{ flex: 1 }}
-        >
+        <Card sx={statCardSx(calculateImprovement() >= 0 ? "success.500" : "danger.500", 2)}>
           <CardContent>
             <Stack direction="row" alignItems="center" spacing={1}>
-              <Typography level="body-sm">Recent Improvement</Typography>
+              <Typography level="body-xs" sx={{ color: "neutral.500", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Recent Improvement
+              </Typography>
               {getScoreIcon(calculateImprovement())}
             </Stack>
             <Typography level="h3">
@@ -164,11 +171,11 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
       </Stack>
 
       {/* Filter and Actions */}
-      <Card variant="outlined" sx={{ mb: 3 }}>
+      <Card variant="outlined" sx={{ mb: 3, boxShadow: "sm" }}>
         <CardContent>
-          <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Typography level="title-sm">Filter Position:</Typography>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }} justifyContent="space-between">
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography level="title-sm" sx={{ whiteSpace: "nowrap" }}>Filter:</Typography>
               <Select
                 value={filterPosition}
                 onChange={(_, value) => setFilterPosition(value || "all")}
@@ -198,19 +205,37 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
 
       {/* Records Table */}
       {filteredRecords.length === 0 ? (
-        <Alert color="neutral" variant="soft">
-          No interview records yet. Start practicing to accumulate your records!
-        </Alert>
+        <Box
+          sx={{
+            textAlign: "center",
+            py: 6,
+            animation: "fadeIn 0.4s ease-out",
+          }}
+        >
+          <InboxIcon sx={{ fontSize: 48, color: "neutral.300", mb: 2 }} />
+          <Typography level="body-lg" sx={{ color: "neutral.500" }}>
+            No interview records yet
+          </Typography>
+          <Typography level="body-sm" sx={{ color: "neutral.400" }}>
+            Start practicing to accumulate your records!
+          </Typography>
+        </Box>
       ) : (
-        <Card variant="outlined">
-          <Table>
+        <Card variant="outlined" sx={{ borderRadius: "lg", overflow: "auto", boxShadow: "sm" }}>
+          <Table
+            sx={{
+              "& tbody tr:nth-of-type(even)": {
+                bgcolor: "neutral.50",
+              },
+            }}
+          >
             <thead>
               <tr>
                 <th style={{ width: "120px" }}>Date & Time</th>
                 <th style={{ width: "120px" }}>Position</th>
                 <th>Question</th>
                 <th style={{ width: "80px" }}>Score</th>
-                <th style={{ width: "140px" }}>Actions</th>
+                <th style={{ width: "100px" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -220,7 +245,7 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
                     <Typography level="body-sm">
                       {record.created_at ? new Date(record.created_at).toLocaleDateString() : ""}
                     </Typography>
-                    <Typography level="body-xs" color="neutral">
+                    <Typography level="body-xs" sx={{ color: "neutral.400" }}>
                       {record.created_at ? new Date(record.created_at).toLocaleTimeString() : ""}
                     </Typography>
                   </td>
@@ -259,25 +284,21 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
                   </td>
                   <td>
                     <Stack direction="row" spacing={0.5}>
-                      <Button
+                      <IconButton
                         size="sm"
                         variant="soft"
-                        startDecorator={<ViewIcon sx={{ fontSize: 16 }} />}
                         onClick={() => handleViewRecord(record)}
-                        sx={{ minWidth: 0, px: 1, py: 0.5, height: 28, fontSize: 12 }}
                       >
-                        <span style={{ fontSize: 12 }}>View</span>
-                      </Button>
-                      <Button
+                        <ViewIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                      <IconButton
                         size="sm"
                         color="danger"
                         variant="soft"
-                        startDecorator={<DeleteIcon sx={{ fontSize: 16 }} />}
                         onClick={() => handleDeleteRecord(record.id || "")}
-                        sx={{ minWidth: 0, px: 1, py: 0.5, height: 28, fontSize: 12 }}
                       >
-                        <span style={{ fontSize: 12 }}>Delete</span>
-                      </Button>
+                        <DeleteIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
                     </Stack>
                   </td>
                 </tr>

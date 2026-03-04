@@ -37,14 +37,14 @@ export default function InterviewRecordDetailsModal({
 
             <Stack spacing={2}>
               <Box>
-                <Typography level="title-sm" color="primary">
+                <Typography level="title-sm" sx={{ color: "primary.600" }}>
                   Position
                 </Typography>
                 <Chip variant="soft">{PositionLabels[record.position as PositionKey]}</Chip>
               </Box>
 
               <Box>
-                <Typography level="title-sm" color="primary">
+                <Typography level="title-sm" sx={{ color: "primary.600" }}>
                   Time
                 </Typography>
                 <Typography level="body-sm">
@@ -55,10 +55,17 @@ export default function InterviewRecordDetailsModal({
               <Divider />
 
               <Box>
-                <Typography level="title-sm" color="primary" sx={{ mb: 1 }}>
+                <Typography level="title-sm" sx={{ color: "primary.600", mb: 1 }}>
                   Interview Question
                 </Typography>
-                <Card variant="soft">
+                <Card
+                  variant="soft"
+                  sx={{
+                    bgcolor: "primary.50",
+                    borderLeft: "4px solid",
+                    borderLeftColor: "primary.500",
+                  }}
+                >
                   <CardContent>
                     <Typography level="body-md">{record.question_content}</Typography>
                   </CardContent>
@@ -66,10 +73,16 @@ export default function InterviewRecordDetailsModal({
               </Box>
 
               <Box>
-                <Typography level="title-sm" color="primary" sx={{ mb: 1 }}>
+                <Typography level="title-sm" sx={{ color: "primary.600", mb: 1 }}>
                   My Answer
                 </Typography>
-                <Card variant="outlined">
+                <Card
+                  variant="outlined"
+                  sx={{
+                    borderLeft: "4px solid",
+                    borderLeftColor: "neutral.400",
+                  }}
+                >
                   <CardContent>
                     <Typography level="body-md" sx={{ whiteSpace: "pre-wrap" }}>
                       {record.answer}
@@ -80,12 +93,19 @@ export default function InterviewRecordDetailsModal({
 
               <Box>
                 <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1 }}>
-                  <Typography level="title-sm" color="primary">
+                  <Typography level="title-sm" sx={{ color: "primary.600" }}>
                     AI Score & Feedback
                   </Typography>
                   <Chip color={getScoreColor(record.score)}>{record.score}/100</Chip>
                 </Stack>
-                <Card variant="soft" color={getScoreColor(record.score)}>
+                <Card
+                  variant="soft"
+                  color={getScoreColor(record.score)}
+                  sx={{
+                    borderLeft: "4px solid",
+                    borderLeftColor: `${getScoreColor(record.score)}.500`,
+                  }}
+                >
                   <CardContent>
                     <Typography level="body-md" sx={{ whiteSpace: "pre-wrap" }}>
                       {record.feedback}

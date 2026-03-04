@@ -17,6 +17,7 @@ import {
   Input,
   CircularProgress,
   Divider,
+  IconButton,
 } from "@mui/joy";
 import {
   Chat as ChatIcon,
@@ -24,12 +25,13 @@ import {
   History as HistoryIcon,
   Check as CheckIcon,
   Cancel as CancelIcon,
+  ArrowBack as ArrowBackIcon,
 } from "@mui/icons-material";
 import InterviewChat from "./InterviewChat.tsx";
 import InterviewHistory from "./InterviewHistory.tsx";
 import ProgressChart from "./ProgressChart.tsx";
 import { startInterviewSession, completeSession } from "../api/api";
-import type { Message, PositionKey } from "../types/interview.ts";
+import type { Message } from "../types/interview.ts";
 import { Difficulty, QuestionType } from "../types/interview";
 import { getDifficultyColor } from "../utils";
 import NewsQuestionPush from "./NewsQuestionPush.tsx";
@@ -54,6 +56,7 @@ const jobPositions = [
   { value: "product", label: "Product Manager" },
   { value: "ui", label: "UI/UX Designer" },
   { value: "data", label: "Data Analyst" },
+  { value: "__custom__", label: "Custom..." },
 ];
 
 export default function InterviewTraining({ username, onLogout }: InterviewTrainingProps) {
@@ -76,6 +79,8 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const openaiApiKey = useAuthStore((state) => state.openaiApiKey);
   const setOpenaiApiKey = useAuthStore((state) => state.setOpenaiApiKey);
 
+  const [customPositionMode, setCustomPositionMode] = useState(false);
+  const [customPositionInput, setCustomPositionInput] = useState("");
   const [activeTab, setActiveTab] = useState<number>(0);
   const [interviewStarted, setInterviewStarted] = useState<boolean>(false);
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>(Difficulty.EASY);
@@ -118,7 +123,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
     try {
       const res = await startInterviewSession({
         user_id: user_id || 0,
-        position: selectedPosition as PositionKey,
+        position: selectedPosition,
       });
       setSessionId(res.session_id);
       setInterviewStarted(true);
@@ -156,7 +161,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
     try {
       const res = await startInterviewSession({
         user_id: user_id || 0,
-        position: selectedPosition as PositionKey,
+        position: selectedPosition,
       });
       setSessionId(res.session_id);
       setInterviewStarted(true);
@@ -333,11 +338,49 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
             <Typography level="body-xs" sx={{ fontWeight: 700, color: "neutral.500", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.65rem" }}>
               Position
             </Typography>
-            <Select variant="plain" value={selectedPosition} onChange={(_, value) => value && handlePositionChange(value)} size="sm" sx={{ minWidth: { xs: 110, md: 140 } }}>
-              {jobPositions.map((position) => (
-                <Option key={position.value} value={position.value}>{position.label}</Option>
-              ))}
-            </Select>
+            {customPositionMode ? (
+              <Stack direction="row" spacing={0.5} alignItems="center">
+                <IconButton size="sm" variant="plain" onClick={() => {
+                  setCustomPositionMode(false);
+                  if (!customPositionInput.trim()) {
+                    handlePositionChange("frontend");
+                  }
+                }}>
+                  <ArrowBackIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+                <Input
+                  size="sm"
+                  variant="plain"
+                  placeholder="e.g. Game Developer"
+                  value={customPositionInput}
+                  onChange={(e) => {
+                    setCustomPositionInput(e.target.value);
+                    if (e.target.value.trim()) {
+                      handlePositionChange(e.target.value.trim());
+                    }
+                  }}
+                  autoFocus
+                  sx={{ minWidth: { xs: 130, md: 160 } }}
+                />
+              </Stack>
+            ) : (
+              <Select variant="plain" value={selectedPosition} onChange={(_, value) => {
+                if (value === "__custom__") {
+                  setCustomPositionMode(true);
+                  setCustomPositionInput("");
+                } else if (value) {
+                  handlePositionChange(value);
+                }
+              }} size="sm" sx={{ minWidth: { xs: 110, md: 140 } }}>
+                {jobPositions.filter(p => p.value !== "__custom__").map((position) => (
+                  <Option key={position.value} value={position.value}>{position.label}</Option>
+                ))}
+                <Divider sx={{ my: 0.5 }} />
+                <Option value="__custom__" sx={{ color: "primary.600", fontWeight: 600 }}>
+                  + Custom Position
+                </Option>
+              </Select>
+            )}
           </Stack>
 
           <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />

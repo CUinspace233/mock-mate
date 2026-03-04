@@ -207,7 +207,7 @@ async def save_interview_record(
         answer=record_data.answer,
         score=record_data.score,
         feedback=record_data.feedback,
-        position=record_data.position.value,
+        position=record_data.position,
         evaluation_details=record_data.evaluation_details,
     )
 

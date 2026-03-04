@@ -603,7 +603,7 @@ async def get_trending_questions(
 
         # Apply filters
         if request.position:
-            query = query.where(models.Question.position == request.position.value)
+            query = query.where(models.Question.position == request.position)
 
         if request.category:
             query = query.where(models.NewsItem.category == request.category.value)

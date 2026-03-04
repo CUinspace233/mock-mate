@@ -249,7 +249,7 @@ async def generate_question(
     """Generate a new interview question"""
     try:
         question_data = await generate_ai_question(
-            request.position.value,
+            request.position,
             request.difficulty.value if request.difficulty else "medium",
             request.question_type,
             request.openai_api_key,

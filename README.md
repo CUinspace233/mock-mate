@@ -59,6 +59,28 @@ The port is `1314` by default, you can change it in `vite.config.ts`
 npm run dev
 ```
 
+## Production Update Script
+
+For the Ubuntu server deployment flow, this repo provides a one-click update script: `update.sh`.
+
+It is designed for the deployment layout described in `DEPLOYMENT.md` (`/root/mockmate/app`) and will:
+- Pull latest code (`git pull`)
+- Sync backend dependencies (`uv sync`)
+- Restart backend service (`systemctl restart mockmate`)
+- Rebuild frontend assets (`npm install` and `npm run build`)
+
+Usage on server:
+
+```bash
+cd /root/mockmate/app
+chmod +x update.sh
+./update.sh
+```
+
+Notes:
+- Run as a user with permission to restart systemd services (usually `root`)
+- Requires the same `conda`/`nvm` environment paths used in `DEPLOYMENT.md`
+
 ## Database Maintenance
 
 The system automatically fetches news and generates interview questions on a schedule. Over time this data accumulates. A scheduled task runs every 24 hours to clean up expired data (default retention: 30 days). You can also run the cleanup manually:

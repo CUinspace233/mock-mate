@@ -1,25 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from database import models
-from api.deps import get_db
-from datetime import datetime, UTC
-from openai import OpenAI
-from fastapi.responses import StreamingResponse
 import json
-from datetime import timezone
+from datetime import UTC, datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
+from openai import OpenAI
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from api.deps import get_db
+from database import models
 from database.schemas import (
     GeneratedQuestion,
+    GenerateFollowUpRequest,
     GenerateQuestionRequest,
     GenerateQuestionResponse,
-    GenerateFollowUpRequest,
-    QuestionCategory,
     QuestionCategoriesResponse,
+    QuestionCategory,
     QuestionOut,
-    TopicCount,
     QuestionType,
+    TopicCount,
 )
-
 
 router = APIRouter()
 
@@ -53,8 +53,11 @@ def _get_client(api_key: str = "") -> OpenAI:
 
 
 async def generate_ai_question(
-    position: str, difficulty: str, question_type: QuestionType | None = QuestionType.TECHNICAL,
-    openai_api_key: str = "", language: str = "en",
+    position: str,
+    difficulty: str,
+    question_type: QuestionType | None = QuestionType.TECHNICAL,
+    openai_api_key: str = "",
+    language: str = "en",
 ) -> GeneratedQuestion:
     """Generate a question using AI (OpenAI GPT)"""
     client = _get_client(openai_api_key)
@@ -62,16 +65,12 @@ async def generate_ai_question(
         f"Generate a {difficulty} level {question_type} interview question for a {position} position. "
         "The question must be specific and knowledge-based — test a concrete concept, principle, API, "
         "algorithm, or technical detail. Do NOT ask broad or open-ended questions like 'Tell me about...' "
-        "or 'Describe your experience with...'. Return only the question."
-        + _lang_prompt(language)
+        "or 'Describe your experience with...'. Return only the question." + _lang_prompt(language)
     )
 
     response = client.responses.create(
         model="gpt-4.1-nano",
-        instructions=(
-            "You are an expert interview question generator."
-            + _lang_system(language)
-        ),
+        instructions=("You are an expert interview question generator." + _lang_system(language)),
         input=prompt,
         max_output_tokens=100,
         temperature=0.9,
@@ -91,8 +90,11 @@ async def generate_ai_question(
         ],
     )
 
+
 @router.post("/generate/stream")
-async def generate_question_stream(req: GenerateQuestionRequest, db: AsyncSession = Depends(get_db)):
+async def generate_question_stream(
+    req: GenerateQuestionRequest, db: AsyncSession = Depends(get_db)
+):
     client = _get_client(req.openai_api_key)
     lang_p = _lang_prompt(req.language)
     if req.is_last_question:
@@ -107,8 +109,7 @@ async def generate_question_stream(req: GenerateQuestionRequest, db: AsyncSessio
             f"Generate a {req.difficulty} level {req.question_type} interview question for a {req.position} position. "
             "The question must be specific and knowledge-based — test a concrete concept, principle, API, "
             "algorithm, or technical detail. Do NOT ask broad or open-ended questions like 'Tell me about...' "
-            "or 'Describe your experience with...'. Return only the question."
-            + lang_p
+            "or 'Describe your experience with...'. Return only the question." + lang_p
         )
 
     async def sse_iter():
@@ -164,8 +165,11 @@ async def generate_question_stream(req: GenerateQuestionRequest, db: AsyncSessio
 
     return StreamingResponse(sse_iter(), media_type="text/event-stream")
 
+
 @router.post("/generate/followup/stream")
-async def generate_followup_stream(req: GenerateFollowUpRequest, db: AsyncSession = Depends(get_db)):
+async def generate_followup_stream(
+    req: GenerateFollowUpRequest, db: AsyncSession = Depends(get_db)
+):
     """Generate a follow-up question based on conversation history, streamed via SSE."""
     client = _get_client(req.openai_api_key)
 
@@ -182,8 +186,7 @@ async def generate_followup_stream(req: GenerateFollowUpRequest, db: AsyncSessio
         "Based on the candidate's last answer, generate a probing follow-up question "
         "that digs deeper into their understanding. The follow-up must be specific and knowledge-based — "
         "ask about a concrete concept, mechanism, or technical detail related to their answer. "
-        "Return only the follow-up question."
-        + _lang_prompt(req.language)
+        "Return only the follow-up question." + _lang_prompt(req.language)
     )
 
     async def sse_iter():

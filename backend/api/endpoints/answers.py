@@ -1,19 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
-from database import models
-from api.deps import get_db
-from datetime import datetime, UTC
-from openai import OpenAI
-from database.schemas import (
-    EvaluateAnswerRequest,
-    EvaluateFollowUpRequest,
-    EvaluateAnswerResponse,
-    EvaluationDetails,
-    AnswerEvaluationResult,
-)
 import json
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from openai import OpenAI
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from api.deps import get_db
+from database import models
+from database.schemas import (
+    AnswerEvaluationResult,
+    EvaluateAnswerRequest,
+    EvaluateAnswerResponse,
+    EvaluateFollowUpRequest,
+    EvaluationDetails,
+)
 
 router = APIRouter()
 
@@ -104,6 +106,7 @@ async def evaluate_answer_ai(
 
     except Exception as e:
         import traceback
+
         print(f"AI evaluation failed: {e}\n{traceback.format_exc()}")
         return evaluate_answer_mock(question_content, answer, expected_keywords)
 
@@ -311,6 +314,7 @@ async def evaluate_followup_ai(
 
     except Exception as e:
         import traceback
+
         print(f"AI follow-up evaluation failed: {e}\n{traceback.format_exc()}")
         # Fallback: concatenate all candidate answers and use mock evaluation
         all_answers = " ".join(
@@ -324,8 +328,7 @@ async def evaluate_followup(request: EvaluateFollowUpRequest, db: AsyncSession =
     """Evaluate an entire multi-turn interview conversation."""
     try:
         conversation_dicts = [
-            {"role": entry.role, "content": entry.content}
-            for entry in request.conversation_history
+            {"role": entry.role, "content": entry.content} for entry in request.conversation_history
         ]
 
         evaluation = await evaluate_followup_ai(

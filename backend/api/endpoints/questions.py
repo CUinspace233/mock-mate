@@ -31,12 +31,20 @@ LANGUAGE_NAMES = {
 }
 
 
-def _lang_instruction(lang: str) -> str:
-    """Return a prompt fragment requiring the given language."""
-    name = LANGUAGE_NAMES.get(lang, lang)
+def _lang_prompt(lang: str) -> str:
+    """Return a prompt suffix requiring the given language."""
     if lang == "en":
         return ""
-    return f" You MUST ask the question in {name}."
+    name = LANGUAGE_NAMES.get(lang, lang)
+    return f" You MUST generate the entire question in {name}. Do NOT use English."
+
+
+def _lang_system(lang: str) -> str:
+    """Return a system-instruction suffix requiring the given language."""
+    if lang == "en":
+        return ""
+    name = LANGUAGE_NAMES.get(lang, lang)
+    return f" IMPORTANT: You must respond entirely in {name}. Never use English in your response."
 
 
 def _get_client(api_key: str = "") -> OpenAI:
@@ -55,12 +63,15 @@ async def generate_ai_question(
         "The question must be specific and knowledge-based — test a concrete concept, principle, API, "
         "algorithm, or technical detail. Do NOT ask broad or open-ended questions like 'Tell me about...' "
         "or 'Describe your experience with...'. Return only the question."
-        + _lang_instruction(language)
+        + _lang_prompt(language)
     )
 
     response = client.responses.create(
         model="gpt-4.1-nano",
-        instructions="You are an expert interview question generator.",
+        instructions=(
+            "You are an expert interview question generator."
+            + _lang_system(language)
+        ),
         input=prompt,
         max_output_tokens=100,
         temperature=0.9,
@@ -83,13 +94,13 @@ async def generate_ai_question(
 @router.post("/generate/stream")
 async def generate_question_stream(req: GenerateQuestionRequest, db: AsyncSession = Depends(get_db)):
     client = _get_client(req.openai_api_key)
-    lang_suffix = _lang_instruction(req.language)
+    lang_p = _lang_prompt(req.language)
     if req.is_last_question:
         prompt = (
             f"Generate a {req.difficulty} level {req.question_type} interview question for a {req.position} position. "
             "This is the final question — it can be a broader, open-ended question that tests the candidate's "
             "overall understanding, design thinking, or practical experience. Return only the question."
-            + lang_suffix
+            + lang_p
         )
     else:
         prompt = (
@@ -97,7 +108,7 @@ async def generate_question_stream(req: GenerateQuestionRequest, db: AsyncSessio
             "The question must be specific and knowledge-based — test a concrete concept, principle, API, "
             "algorithm, or technical detail. Do NOT ask broad or open-ended questions like 'Tell me about...' "
             "or 'Describe your experience with...'. Return only the question."
-            + lang_suffix
+            + lang_p
         )
 
     async def sse_iter():
@@ -110,6 +121,7 @@ async def generate_question_stream(req: GenerateQuestionRequest, db: AsyncSessio
                 "You are an expert interview question generator. "
                 "Always generate specific, knowledge-based questions that test concrete understanding. "
                 "Avoid broad, open-ended, or experience-based questions."
+                + _lang_system(req.language)
             ),
             input=prompt,
             max_output_tokens=100,
@@ -171,7 +183,7 @@ async def generate_followup_stream(req: GenerateFollowUpRequest, db: AsyncSessio
         "that digs deeper into their understanding. The follow-up must be specific and knowledge-based — "
         "ask about a concrete concept, mechanism, or technical detail related to their answer. "
         "Return only the follow-up question."
-        + _lang_instruction(req.language)
+        + _lang_prompt(req.language)
     )
 
     async def sse_iter():
@@ -184,6 +196,7 @@ async def generate_followup_stream(req: GenerateFollowUpRequest, db: AsyncSessio
                 "You are an expert technical interviewer conducting a multi-round interview. "
                 "Generate specific, knowledge-based follow-up questions that probe concrete technical details "
                 "based on the candidate's previous answers. Avoid broad or open-ended questions."
+                + _lang_system(req.language)
             ),
             input=prompt,
             max_output_tokens=150,

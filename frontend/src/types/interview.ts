@@ -50,6 +50,8 @@ export interface GenerateQuestionRequest {
   question_type: QuestionType;
   user_id: number;
   openai_api_key: string;
+  is_last_question?: boolean;
+  language?: string;
 }
 
 export interface GenerateQuestionResponse {
@@ -86,6 +88,7 @@ export interface FollowUpRequest {
   difficulty: string | null;
   user_id: number;
   openai_api_key: string;
+  language?: string;
 }
 
 export interface FollowUpStreamResponse extends GenerateQuestionResponse {

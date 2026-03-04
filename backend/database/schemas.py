@@ -91,6 +91,8 @@ class GenerateQuestionRequest(BaseModel):
     question_type: QuestionType | None = QuestionType.TECHNICAL
     user_id: int
     openai_api_key: str
+    is_last_question: bool = False
+    language: str = "en"
 
 
 class GenerateQuestionResponse(BaseModel):
@@ -126,6 +128,7 @@ class GenerateFollowUpRequest(BaseModel):
     difficulty: str | None = "medium"
     user_id: int
     openai_api_key: str
+    language: str = "en"
 
 
 class EvaluateFollowUpRequest(BaseModel):

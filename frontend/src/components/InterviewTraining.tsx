@@ -72,6 +72,8 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const setQuestionCountTarget = useAuthStore((state) => state.setQuestionCountTarget);
   const followUpLimit = useAuthStore((state) => state.followUpLimit);
   const setFollowUpLimit = useAuthStore((state) => state.setFollowUpLimit);
+  const language = useAuthStore((state) => state.language);
+  const setLanguage = useAuthStore((state) => state.setLanguage);
   const openaiApiKey = useAuthStore((state) => state.openaiApiKey);
   const setOpenaiApiKey = useAuthStore((state) => state.setOpenaiApiKey);
 
@@ -342,95 +344,99 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
       {/* Position Selection */}
       <Card variant="outlined" sx={{ mb: { xs: 2, sm: 3 } }}>
         <CardContent>
-          <Stack
-            direction={{ xs: "column", lg: "row" }}
-            spacing={2}
-            alignItems={{ xs: "stretch", lg: "center" }}
-          >
-            <Typography level="title-md" sx={{ flexShrink: 0 }}>
-              Select Target Position:
-            </Typography>
-            <Select
-              value={selectedPosition}
-              onChange={(_, value) => value && handlePositionChange(value)}
-              sx={{ minWidth: { xs: "100%", sm: 200 } }}
-            >
-              {jobPositions.map((position) => (
-                <Option key={position.value} value={position.value}>
-                  {position.label}
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center" }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography level="title-md" noWrap>Position:</Typography>
+              <Select
+                value={selectedPosition}
+                onChange={(_, value) => value && handlePositionChange(value)}
+                sx={{ minWidth: 160 }}
+              >
+                {jobPositions.map((position) => (
+                  <Option key={position.value} value={position.value}>
+                    {position.label}
+                  </Option>
+                ))}
+              </Select>
+            </Stack>
+
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography level="title-md" noWrap>Type:</Typography>
+              <Select
+                value={selectedQuestionType}
+                onChange={(_, value) => value && setSelectedQuestionType(value as QuestionType)}
+                sx={{ minWidth: 140 }}
+              >
+                <Option value={QuestionType.TECHNICAL}>Technical</Option>
+                <Option value={QuestionType.BEHAVIORAL}>Behavioral</Option>
+                <Option value={QuestionType.OPINION}>Opinion</Option>
+              </Select>
+            </Stack>
+
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography level="title-md" noWrap>Difficulty:</Typography>
+              <Select
+                value={selectedDifficulty}
+                onChange={(_, value) => value && setSelectedDifficulty(value as Difficulty)}
+                color={getDifficultyColor(selectedDifficulty) as ColorPaletteProp}
+                sx={{ minWidth: 110 }}
+              >
+                <Option value={Difficulty.EASY}>
+                  <Chip color="success" variant="soft" size="sm">Easy</Chip>
                 </Option>
-              ))}
-            </Select>
+                <Option value={Difficulty.MEDIUM}>
+                  <Chip color="warning" variant="soft" size="sm">Medium</Chip>
+                </Option>
+                <Option value={Difficulty.HARD}>
+                  <Chip color="danger" variant="soft" size="sm">Hard</Chip>
+                </Option>
+              </Select>
+            </Stack>
 
-            <Typography level="title-md" sx={{ flexShrink: 0 }}>
-              Select Question Type:
-            </Typography>
-            <Select
-              value={selectedQuestionType}
-              onChange={(_, value) => value && setSelectedQuestionType(value as QuestionType)}
-              sx={{ minWidth: { xs: "100%", sm: 180 } }}
-            >
-              <Option value={QuestionType.TECHNICAL}>Technical</Option>
-              <Option value={QuestionType.BEHAVIORAL}>Behavioral</Option>
-              <Option value={QuestionType.OPINION}>Opinion</Option>
-            </Select>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography level="title-md" noWrap>Questions:</Typography>
+              <Select
+                value={questionCountTarget}
+                onChange={(_, value) => value && setQuestionCountTarget(value as number)}
+                sx={{ minWidth: 70 }}
+              >
+                <Option value={3}>3</Option>
+                <Option value={5}>5</Option>
+                <Option value={8}>8</Option>
+                <Option value={10}>10</Option>
+              </Select>
+            </Stack>
 
-            <Typography level="title-md" sx={{ flexShrink: 0 }}>
-              Select Difficulty:
-            </Typography>
-            <Select
-              value={selectedDifficulty}
-              onChange={(_, value) => value && setSelectedDifficulty(value as Difficulty)}
-              color={getDifficultyColor(selectedDifficulty) as ColorPaletteProp}
-              sx={{ minWidth: { xs: "100%", sm: 150 } }}
-            >
-              <Option value={Difficulty.EASY}>
-                <Chip color="success" variant="soft" size="sm">
-                  Easy
-                </Chip>
-              </Option>
-              <Option value={Difficulty.MEDIUM}>
-                <Chip color="warning" variant="soft" size="sm">
-                  Medium
-                </Chip>
-              </Option>
-              <Option value={Difficulty.HARD}>
-                <Chip color="danger" variant="soft" size="sm">
-                  Hard
-                </Chip>
-              </Option>
-            </Select>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography level="title-md" noWrap>Follow-ups:</Typography>
+              <Select
+                value={followUpLimit}
+                onChange={(_, value) => value !== null && setFollowUpLimit(value as number)}
+                sx={{ minWidth: 80 }}
+              >
+                <Option value={0}>Off</Option>
+                <Option value={1}>1</Option>
+                <Option value={2}>2</Option>
+                <Option value={3}>3</Option>
+                <Option value={4}>4</Option>
+                <Option value={5}>5</Option>
+              </Select>
+            </Stack>
 
-            <Typography level="title-md" sx={{ flexShrink: 0 }}>
-              Question Count:
-            </Typography>
-            <Select
-              value={questionCountTarget}
-              onChange={(_, value) => value && setQuestionCountTarget(value as number)}
-              sx={{ minWidth: { xs: "100%", sm: 100 } }}
-            >
-              <Option value={3}>3</Option>
-              <Option value={5}>5</Option>
-              <Option value={8}>8</Option>
-              <Option value={10}>10</Option>
-            </Select>
-
-            <Typography level="title-md" sx={{ flexShrink: 0 }}>
-              Follow-ups:
-            </Typography>
-            <Select
-              value={followUpLimit}
-              onChange={(_, value) => value !== null && setFollowUpLimit(value as number)}
-              sx={{ minWidth: { xs: "100%", sm: 100 } }}
-            >
-              <Option value={0}>0 (Off)</Option>
-              <Option value={1}>1</Option>
-              <Option value={2}>2</Option>
-              <Option value={3}>3</Option>
-              <Option value={4}>4</Option>
-              <Option value={5}>5</Option>
-            </Select>
-          </Stack>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography level="title-md" noWrap>Language:</Typography>
+              <Select
+                value={language}
+                onChange={(_, value) => value && setLanguage(value as string)}
+                sx={{ minWidth: 120 }}
+              >
+                <Option value="en">English</Option>
+                <Option value="zh">中文</Option>
+                <Option value="ja">日本語</Option>
+                <Option value="ko">한국어</Option>
+              </Select>
+            </Stack>
+          </Box>
         </CardContent>
       </Card>
 
@@ -486,6 +492,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
               currentQuestionNumber={currentQuestionNumber}
               onQuestionNumberIncrement={handleQuestionNumberIncrement}
               followUpLimit={followUpLimit}
+              language={language}
             />
           </TabPanel>
 

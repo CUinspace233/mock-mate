@@ -11,6 +11,10 @@ type AuthState = {
   sessionId: string | null;
   questionCountTarget: number;
   setQuestionCountTarget: (count: number) => void;
+  followUpLimit: number;
+  setFollowUpLimit: (limit: number) => void;
+  language: string;
+  setLanguage: (language: string) => void;
   openaiApiKey: string;
   setOpenaiApiKey: (apiKey: string) => void;
   setDailyQuestionCount: (count: number) => void;
@@ -34,6 +38,10 @@ export const useAuthStore = create<AuthState>()(
       sessionId: null,
       questionCountTarget: 5,
       setQuestionCountTarget: (count) => set({ questionCountTarget: count }),
+      followUpLimit: 2,
+      setFollowUpLimit: (limit) => set({ followUpLimit: limit }),
+      language: "en",
+      setLanguage: (language) => set({ language }),
       openaiApiKey: "",
       setOpenaiApiKey: (apiKey) => set({ openaiApiKey: apiKey }),
       setDailyQuestionCount: (count) => set({ dailyQuestionCount: count }),
@@ -55,6 +63,8 @@ export const useAuthStore = create<AuthState>()(
         selectedPosition: state.selectedPosition,
         sessionId: state.sessionId,
         questionCountTarget: state.questionCountTarget,
+        followUpLimit: state.followUpLimit,
+        language: state.language,
         openaiApiKey: state.openaiApiKey,
       }),
     },

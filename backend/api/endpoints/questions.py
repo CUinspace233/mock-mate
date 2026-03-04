@@ -23,6 +23,21 @@ from database.schemas import (
 
 router = APIRouter()
 
+LANGUAGE_NAMES = {
+    "en": "English",
+    "zh": "Chinese",
+    "ja": "Japanese",
+    "ko": "Korean",
+}
+
+
+def _lang_instruction(lang: str) -> str:
+    """Return a prompt fragment requiring the given language."""
+    name = LANGUAGE_NAMES.get(lang, lang)
+    if lang == "en":
+        return ""
+    return f" You MUST ask the question in {name}."
+
 
 def _get_client(api_key: str = "") -> OpenAI:
     """Create OpenAI client using provided key, fallback to env var."""
@@ -31,13 +46,16 @@ def _get_client(api_key: str = "") -> OpenAI:
 
 async def generate_ai_question(
     position: str, difficulty: str, question_type: QuestionType | None = QuestionType.TECHNICAL,
-    openai_api_key: str = "",
+    openai_api_key: str = "", language: str = "en",
 ) -> GeneratedQuestion:
     """Generate a question using AI (OpenAI GPT)"""
     client = _get_client(openai_api_key)
     prompt = (
-        f"Generate a {difficulty} level {question_type} interview question for a {position} position"
-        + " Return only the question."
+        f"Generate a {difficulty} level {question_type} interview question for a {position} position. "
+        "The question must be specific and knowledge-based — test a concrete concept, principle, API, "
+        "algorithm, or technical detail. Do NOT ask broad or open-ended questions like 'Tell me about...' "
+        "or 'Describe your experience with...'. Return only the question."
+        + _lang_instruction(language)
     )
 
     response = client.responses.create(
@@ -65,7 +83,22 @@ async def generate_ai_question(
 @router.post("/generate/stream")
 async def generate_question_stream(req: GenerateQuestionRequest, db: AsyncSession = Depends(get_db)):
     client = _get_client(req.openai_api_key)
-    prompt = f"Generate a {req.difficulty} level {req.question_type} interview question for a {req.position} position Return only the question."
+    lang_suffix = _lang_instruction(req.language)
+    if req.is_last_question:
+        prompt = (
+            f"Generate a {req.difficulty} level {req.question_type} interview question for a {req.position} position. "
+            "This is the final question — it can be a broader, open-ended question that tests the candidate's "
+            "overall understanding, design thinking, or practical experience. Return only the question."
+            + lang_suffix
+        )
+    else:
+        prompt = (
+            f"Generate a {req.difficulty} level {req.question_type} interview question for a {req.position} position. "
+            "The question must be specific and knowledge-based — test a concrete concept, principle, API, "
+            "algorithm, or technical detail. Do NOT ask broad or open-ended questions like 'Tell me about...' "
+            "or 'Describe your experience with...'. Return only the question."
+            + lang_suffix
+        )
 
     async def sse_iter():
         content = ""
@@ -73,7 +106,11 @@ async def generate_question_stream(req: GenerateQuestionRequest, db: AsyncSessio
 
         with client.responses.stream(
             model="gpt-4.1-nano",
-            instructions="You are an expert interview question generator.",
+            instructions=(
+                "You are an expert interview question generator. "
+                "Always generate specific, knowledge-based questions that test concrete understanding. "
+                "Avoid broad, open-ended, or experience-based questions."
+            ),
             input=prompt,
             max_output_tokens=100,
             temperature=0.9,
@@ -131,7 +168,10 @@ async def generate_followup_stream(req: GenerateFollowUpRequest, db: AsyncSessio
         f"This is follow-up #{req.follow_up_number} of {req.max_follow_ups}.\n\n"
         f"Conversation so far:\n{conversation_text}\n"
         "Based on the candidate's last answer, generate a probing follow-up question "
-        "that digs deeper into their understanding. Return only the follow-up question."
+        "that digs deeper into their understanding. The follow-up must be specific and knowledge-based — "
+        "ask about a concrete concept, mechanism, or technical detail related to their answer. "
+        "Return only the follow-up question."
+        + _lang_instruction(req.language)
     )
 
     async def sse_iter():
@@ -142,8 +182,8 @@ async def generate_followup_stream(req: GenerateFollowUpRequest, db: AsyncSessio
             model="gpt-4.1-nano",
             instructions=(
                 "You are an expert technical interviewer conducting a multi-round interview. "
-                "Generate insightful follow-up questions that probe deeper into the candidate's "
-                "knowledge based on their previous answers."
+                "Generate specific, knowledge-based follow-up questions that probe concrete technical details "
+                "based on the candidate's previous answers. Avoid broad or open-ended questions."
             ),
             input=prompt,
             max_output_tokens=150,
@@ -200,6 +240,7 @@ async def generate_question(
             request.difficulty.value if request.difficulty else "medium",
             request.question_type,
             request.openai_api_key,
+            request.language,
         )
 
         question = models.Question(

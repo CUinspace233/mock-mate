@@ -68,6 +68,7 @@ interface InterviewChatProps {
   currentQuestionNumber: number;
   onQuestionNumberIncrement: () => void;
   followUpLimit: number;
+  language: string;
 }
 
 export default function InterviewChat({
@@ -92,6 +93,7 @@ export default function InterviewChat({
   currentQuestionNumber,
   onQuestionNumberIncrement,
   followUpLimit,
+  language,
 }: InterviewChatProps) {
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -137,6 +139,8 @@ export default function InterviewChat({
         question_type: questionType,
         user_id: user_id,
         openai_api_key: openaiApiKey,
+        is_last_question: currentQuestionNumber + 1 >= questionCountTarget,
+        language,
       };
 
       // Insert a placeholder AI message to stream into
@@ -213,6 +217,8 @@ export default function InterviewChat({
           question_type: questionType,
           user_id: user_id,
           openai_api_key: openaiApiKey,
+          is_last_question: currentQuestionNumber + 1 >= questionCountTarget,
+          language,
         };
 
         const data = await generateQuestionApi(req);
@@ -288,6 +294,9 @@ export default function InterviewChat({
     openaiApiKey,
     onQuestionNumberIncrement,
     followUpLimit,
+    currentQuestionNumber,
+    questionCountTarget,
+    language,
   ]);
 
   const processPresetQuestion = useCallback(
@@ -458,6 +467,7 @@ export default function InterviewChat({
         difficulty: selectedDifficulty,
         user_id: user_id,
         openai_api_key: openaiApiKey,
+        language,
       },
       (delta: string) => {
         if (!firstDeltaHandled) {

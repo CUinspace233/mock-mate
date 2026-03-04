@@ -1,28 +1,30 @@
-from dataclasses import dataclass
-from typing import Sequence
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, desc, delete, text
-from database import models
-from api.deps import get_db
-from datetime import datetime, UTC, timedelta
-from openai import AsyncOpenAI
-import feedparser  # type: ignore
+import asyncio
 import logging
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from typing import Sequence
+
+import feedparser  # type: ignore
+import httpx
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from openai import AsyncOpenAI
+from sqlalchemy import and_, delete, desc, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from api.deps import get_db
+from database import models
 from database.schemas import (
-    NewsSourceType,
-    NewsCategory,
-    QuestionType,
-    NewsSourceOut,
-    TrendingQuestionResponse,
     FetchNewsRequest,
     FetchNewsResponse,
+    GeneratedQuestion,
     GetTrendingQuestionsRequest,
     GetTrendingQuestionsResponse,
-    GeneratedQuestion,
+    NewsCategory,
+    NewsSourceOut,
+    NewsSourceType,
+    QuestionType,
+    TrendingQuestionResponse,
 )
-import httpx
-import asyncio
 from utility.settings import settings
 
 router = APIRouter()
@@ -349,7 +351,11 @@ async def fetch_latest_news(
     try:
         # Add background task for news processing
         background_tasks.add_task(
-            process_news_and_generate_questions, db, request.category, request.limit, request.openai_api_key
+            process_news_and_generate_questions,
+            db,
+            request.category,
+            request.limit,
+            request.openai_api_key,
         )
 
         return FetchNewsResponse(
@@ -366,7 +372,10 @@ async def fetch_latest_news(
 
 
 async def process_news_and_generate_questions(
-    db: AsyncSession, category: NewsCategory | None = None, limit: int = 10, openai_api_key: str = ""
+    db: AsyncSession,
+    category: NewsCategory | None = None,
+    limit: int = 10,
+    openai_api_key: str = "",
 ):
     """Background task to process news and generate questions"""
     try:
@@ -699,9 +708,7 @@ async def cleanup_old_news(db: AsyncSession, retention_days: int) -> None:
     deleted_nbq = 0
     if expired_nbq_ids:
         result = await db.execute(
-            delete(models.NewsBasedQuestion).where(
-                models.NewsBasedQuestion.id.in_(expired_nbq_ids)
-            )
+            delete(models.NewsBasedQuestion).where(models.NewsBasedQuestion.id.in_(expired_nbq_ids))
         )
         deleted_nbq = result.rowcount  # type: ignore[assignment]
 

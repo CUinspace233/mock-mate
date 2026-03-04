@@ -10,16 +10,18 @@ Usage:
 
 import argparse
 import asyncio
-import sys
 import os
+import sys
 
 # Ensure backend directory is on the path so imports work when run from anywhere
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from datetime import datetime, UTC, timedelta
-from sqlalchemy import select, delete, text, func
-from database.session import engine, AsyncSessionLocal
+from datetime import UTC, datetime, timedelta
+
+from sqlalchemy import delete, func, select, text
+
 from database import models
+from database.session import AsyncSessionLocal, engine
 from utility.settings import settings
 
 
@@ -29,9 +31,9 @@ async def preview_cleanup(retention_days: int) -> None:
 
     async with AsyncSessionLocal() as db:
         news_count = await db.scalar(
-            select(func.count()).select_from(models.NewsItem).where(
-                models.NewsItem.published_at < cutoff_date
-            )
+            select(func.count())
+            .select_from(models.NewsItem)
+            .where(models.NewsItem.published_at < cutoff_date)
         )
         nbq_count = await db.scalar(
             select(func.count())
@@ -120,13 +122,18 @@ async def run_cleanup(retention_days: int) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Clean up expired news data from MockMate database")
+    parser = argparse.ArgumentParser(
+        description="Clean up expired news data from MockMate database"
+    )
     parser.add_argument(
-        "--days", type=int, default=settings.news_retention_days,
+        "--days",
+        type=int,
+        default=settings.news_retention_days,
         help=f"Retention period in days (default: {settings.news_retention_days})",
     )
     parser.add_argument(
-        "--dry-run", action="store_true",
+        "--dry-run",
+        action="store_true",
         help="Preview what would be deleted without making changes",
     )
     args = parser.parse_args()

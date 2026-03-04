@@ -1,17 +1,19 @@
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from database import models
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from api.deps import get_db
-from datetime import datetime, UTC
+from database import models
 from database.schemas import (
-    StartSessionRequest,
-    StartSessionResponse,
     CompleteSessionRequest,
     CompleteSessionResponse,
-    SessionSummary,
     SessionDetailResponse,
+    SessionSummary,
     SessionType,
+    StartSessionRequest,
+    StartSessionResponse,
 )
 
 router = APIRouter()

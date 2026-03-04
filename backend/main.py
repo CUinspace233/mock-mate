@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.endpoints import user, questions, answers, sessions, trending
+from api.endpoints import answers, questions, sessions, trending, user
 from database.models import Base
 from database.session import engine
 from scheduler import start_scheduler

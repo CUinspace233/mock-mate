@@ -45,8 +45,17 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             borderRadius: "50%",
             background: "rgba(255,255,255,0.06)",
             animation: "float 6s ease-in-out infinite",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
-        />
+        >
+          <img
+            src="/robot_icon.png"
+            alt=""
+            style={{ width: 90, height: 90, opacity: 0.45 }}
+          />
+        </Box>
         <Box
           sx={{
             position: "absolute",

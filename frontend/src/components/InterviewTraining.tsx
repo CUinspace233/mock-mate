@@ -38,6 +38,7 @@ import NewsQuestionPush from "./NewsQuestionPush.tsx";
 import type { NewsQuestion } from "../types/interview.ts";
 import { useAuthStore } from "../stores/useAuthStore.ts";
 import { useDebounceWithImmediate } from "../hooks/useDebounce.ts";
+import { decryptApiKey } from "../crypto.ts";
 
 interface InterviewTrainingProps {
   username: string;
@@ -76,8 +77,24 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const setFollowUpLimit = useAuthStore((state) => state.setFollowUpLimit);
   const language = useAuthStore((state) => state.language);
   const setLanguage = useAuthStore((state) => state.setLanguage);
-  const openaiApiKey = useAuthStore((state) => state.openaiApiKey);
+  const encryptedApiKey = useAuthStore((state) => state.openaiApiKey);
   const setOpenaiApiKey = useAuthStore((state) => state.setOpenaiApiKey);
+  const [displayApiKey, setDisplayApiKey] = useState("");
+  const [apiKeyRestored, setApiKeyRestored] = useState(false);
+
+  // Decrypt stored key on mount / when encrypted value changes
+  useEffect(() => {
+    if (encryptedApiKey) {
+      decryptApiKey(encryptedApiKey).then((plain) => {
+        if (plain) {
+          setDisplayApiKey(plain);
+          setApiKeyRestored(true);
+        }
+      });
+    } else {
+      setDisplayApiKey("");
+    }
+  }, [encryptedApiKey]);
 
   const [customPositionMode, setCustomPositionMode] = useState(false);
   const [customPositionInput, setCustomPositionInput] = useState("");
@@ -210,13 +227,20 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   );
 
   useEffect(() => {
-    if (openaiApiKey.trim()) {
+    // Skip validation when restoring from storage on mount
+    if (apiKeyRestored) {
+      setApiKeyStatus(displayApiKey.trim() ? "valid" : "idle");
+      setApiKeyRestored(false);
+      return;
+    }
+    if (displayApiKey.trim()) {
       setApiKeyStatus("checking");
-      validateOpenaiApiKey(openaiApiKey);
+      validateOpenaiApiKey(displayApiKey);
     } else {
       setApiKeyStatus("idle");
     }
-  }, [openaiApiKey, validateOpenaiApiKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayApiKey]);
 
   return (
     <Sheet
@@ -280,9 +304,10 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
         >
           <Input
             placeholder="OpenAI API Key"
-            value={openaiApiKey}
+            value={displayApiKey}
             onChange={(e) => {
               const value = e.target.value;
+              setDisplayApiKey(value);
               setOpenaiApiKey(value);
               if (value.trim()) {
                 setApiKeyStatus("checking");
@@ -316,7 +341,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
               }
             }}
             isInterviewActive={interviewStarted}
-            openaiApiKey={openaiApiKey}
+            openaiApiKey={displayApiKey}
           />
         </Stack>
 
@@ -521,7 +546,7 @@ Follow-ups
                 presetQuestion={pendingNewsQuestion}
                 onPresetQuestionUsed={handleNewsQuestionUsed}
                 questionType={selectedQuestionType}
-                openaiApiKey={openaiApiKey}
+                openaiApiKey={displayApiKey}
                 questionCountTarget={questionCountTarget}
                 currentQuestionNumber={currentQuestionNumber}
                 onQuestionNumberIncrement={handleQuestionNumberIncrement}

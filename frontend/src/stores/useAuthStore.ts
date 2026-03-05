@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { encryptApiKey, decryptApiKey } from "../crypto";
 
 type AuthState = {
   isLoggedIn: boolean;
@@ -15,8 +16,9 @@ type AuthState = {
   setFollowUpLimit: (limit: number) => void;
   language: string;
   setLanguage: (language: string) => void;
-  openaiApiKey: string;
+  openaiApiKey: string; // stored encrypted
   setOpenaiApiKey: (apiKey: string) => void;
+  getDecryptedApiKey: () => Promise<string>;
   setDailyQuestionCount: (count: number) => void;
   setDailyQuestionDate: (date: string) => void;
   setSelectedPosition: (position: string) => void;
@@ -28,7 +30,7 @@ type AuthState = {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       isLoggedIn: false,
       username: "",
       user_id: undefined,
@@ -43,7 +45,10 @@ export const useAuthStore = create<AuthState>()(
       language: "en",
       setLanguage: (language) => set({ language }),
       openaiApiKey: "",
-      setOpenaiApiKey: (apiKey) => set({ openaiApiKey: apiKey }),
+      setOpenaiApiKey: (apiKey) => {
+        encryptApiKey(apiKey).then((encrypted) => set({ openaiApiKey: encrypted }));
+      },
+      getDecryptedApiKey: () => decryptApiKey(get().openaiApiKey),
       setDailyQuestionCount: (count) => set({ dailyQuestionCount: count }),
       setDailyQuestionDate: (date) => set({ dailyQuestionDate: date }),
       setSelectedPosition: (position) => set({ selectedPosition: position }),

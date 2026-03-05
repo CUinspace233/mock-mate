@@ -200,6 +200,7 @@ export default function NewsQuestionPush({
             maxHeight: "95vh",
             overflow: "auto",
             p: 0,
+            pt: 5,
           }}
         >
           <ModalClose />

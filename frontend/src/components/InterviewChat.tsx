@@ -774,6 +774,23 @@ export default function InterviewChat({
               }}
             >
               <CardContent sx={{ p: 2 }}>
+                {message.id.startsWith("temp-") && !message.content ? (
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    {[0, 1, 2].map((i) => (
+                      <Box
+                        key={i}
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          bgcolor: "primary.400",
+                          animation: "dotPulse 1.4s ease-in-out infinite",
+                          animationDelay: `${i * 0.2}s`,
+                        }}
+                      />
+                    ))}
+                  </Stack>
+                ) : (
                 <Typography
                   level="body-md"
                   sx={{
@@ -783,6 +800,7 @@ export default function InterviewChat({
                 >
                   {message.content}
                 </Typography>
+                )}
                 {message.score && (
                   <Box sx={{ mt: 1 }}>
                     <Chip
@@ -810,7 +828,7 @@ export default function InterviewChat({
           </Stack>
         ))}
 
-        {isLoading && (
+        {isLoading && !messages.some((m) => m.id.startsWith("temp-")) && (
           <Stack direction="row" spacing={2} alignItems="center" sx={{ animation: "fadeIn 0.3s ease-out" }}>
             <Avatar size="sm" sx={{ bgcolor: "primary.100", color: "primary.600" }}>
               <Box component="img" src="/robot_icon.png" alt="AI" sx={{ width: 24, height: 24 }} />

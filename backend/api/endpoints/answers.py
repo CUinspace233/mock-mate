@@ -58,7 +58,11 @@ EVALUATION_TEXT_FORMAT = {
 
 
 async def evaluate_answer_ai(
-    question_content: str, answer: str, expected_keywords: list[str], openai_api_key: str = ""
+    question_content: str,
+    answer: str,
+    expected_keywords: list[str],
+    openai_api_key: str = "",
+    openai_model: str = "gpt-4.1-nano",
 ) -> AnswerEvaluationResult:
     """AI-powered answer evaluation using OpenAI GPT with structured output"""
     client = OpenAI(api_key=openai_api_key) if openai_api_key else OpenAI()
@@ -77,7 +81,7 @@ async def evaluate_answer_ai(
 
     try:
         response = client.responses.create(
-            model="gpt-4.1-nano",
+            model=openai_model,
             instructions="You are an expert technical interviewer. Evaluate answers objectively and provide constructive feedback.",
             input=prompt,
             max_output_tokens=800,
@@ -206,7 +210,11 @@ async def evaluate_answer(request: EvaluateAnswerRequest, db: AsyncSession = Dep
 
         # Evaluate the answer using AI with provided API key
         evaluation = await evaluate_answer_ai(
-            question_content or "", request.answer, expected_keywords or [], request.openai_api_key
+            question_content or "",
+            request.answer,
+            expected_keywords or [],
+            request.openai_api_key,
+            request.openai_model,
         )
 
         answer_evaluation = models.AnswerEvaluation(
@@ -255,6 +263,7 @@ async def evaluate_followup_ai(
     original_question: str,
     conversation_history: list[dict],
     openai_api_key: str = "",
+    openai_model: str = "gpt-4.1-nano",
 ) -> AnswerEvaluationResult:
     """AI-powered evaluation of a full multi-turn interview conversation."""
     client = OpenAI(api_key=openai_api_key) if openai_api_key else OpenAI()
@@ -280,7 +289,7 @@ async def evaluate_followup_ai(
 
     try:
         response = client.responses.create(
-            model="gpt-4.1-nano",
+            model=openai_model,
             instructions=(
                 "You are an expert technical interviewer. Evaluate the entire multi-turn "
                 "conversation objectively. Pay special attention to how the candidate responds "
@@ -335,6 +344,7 @@ async def evaluate_followup(request: EvaluateFollowUpRequest, db: AsyncSession =
             request.original_question,
             conversation_dicts,
             request.openai_api_key,
+            request.openai_model,
         )
 
         # Concatenate all candidate answers for the record

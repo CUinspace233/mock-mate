@@ -16,6 +16,8 @@ type AuthState = {
   setFollowUpLimit: (limit: number) => void;
   language: string;
   setLanguage: (language: string) => void;
+  openaiModel: string;
+  setOpenaiModel: (model: string) => void;
   openaiApiKey: string; // stored encrypted
   setOpenaiApiKey: (apiKey: string) => void;
   getDecryptedApiKey: () => Promise<string>;
@@ -44,6 +46,8 @@ export const useAuthStore = create<AuthState>()(
       setFollowUpLimit: (limit) => set({ followUpLimit: limit }),
       language: "en",
       setLanguage: (language) => set({ language }),
+      openaiModel: "gpt-4.1-nano",
+      setOpenaiModel: (model) => set({ openaiModel: model }),
       openaiApiKey: "",
       setOpenaiApiKey: (apiKey) => {
         encryptApiKey(apiKey).then((encrypted) => set({ openaiApiKey: encrypted }));
@@ -70,6 +74,7 @@ export const useAuthStore = create<AuthState>()(
         questionCountTarget: state.questionCountTarget,
         followUpLimit: state.followUpLimit,
         language: state.language,
+        openaiModel: state.openaiModel,
         openaiApiKey: state.openaiApiKey,
       }),
     },

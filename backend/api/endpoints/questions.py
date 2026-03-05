@@ -58,6 +58,7 @@ async def generate_ai_question(
     question_type: QuestionType | None = QuestionType.TECHNICAL,
     openai_api_key: str = "",
     language: str = "en",
+    openai_model: str = "gpt-4.1-nano",
 ) -> GeneratedQuestion:
     """Generate a question using AI (OpenAI GPT)"""
     client = _get_client(openai_api_key)
@@ -69,7 +70,7 @@ async def generate_ai_question(
     )
 
     response = client.responses.create(
-        model="gpt-4.1-nano",
+        model=openai_model,
         instructions=("You are an expert interview question generator." + _lang_system(language)),
         input=prompt,
         max_output_tokens=100,
@@ -117,7 +118,7 @@ async def generate_question_stream(
         response_id = None
 
         with client.responses.stream(
-            model="gpt-4.1-nano",
+            model=req.openai_model,
             instructions=(
                 "You are an expert interview question generator. "
                 "Always generate specific, knowledge-based questions that test concrete understanding. "
@@ -194,7 +195,7 @@ async def generate_followup_stream(
         response_id = None
 
         with client.responses.stream(
-            model="gpt-4.1-nano",
+            model=req.openai_model,
             instructions=(
                 "You are an expert technical interviewer conducting a multi-round interview. "
                 "Generate specific, knowledge-based follow-up questions that probe concrete technical details "
@@ -257,6 +258,7 @@ async def generate_question(
             request.question_type,
             request.openai_api_key,
             request.language,
+            request.openai_model,
         )
 
         question = models.Question(

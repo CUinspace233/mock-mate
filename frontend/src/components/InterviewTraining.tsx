@@ -77,10 +77,13 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const setFollowUpLimit = useAuthStore((state) => state.setFollowUpLimit);
   const language = useAuthStore((state) => state.language);
   const setLanguage = useAuthStore((state) => state.setLanguage);
+  const openaiModel = useAuthStore((state) => state.openaiModel);
+  const setOpenaiModel = useAuthStore((state) => state.setOpenaiModel);
   const encryptedApiKey = useAuthStore((state) => state.openaiApiKey);
   const setOpenaiApiKey = useAuthStore((state) => state.setOpenaiApiKey);
   const [displayApiKey, setDisplayApiKey] = useState("");
   const [apiKeyRestored, setApiKeyRestored] = useState(false);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
 
   // Decrypt stored key on mount / when encrypted value changes
   useEffect(() => {
@@ -200,6 +203,35 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
     "idle",
   );
 
+  const parseModels = useCallback((data: { data: { id: string }[] }) => {
+    // Only keep modern GPT families (Responses API compatible)
+    // Exclude fine-tune snapshots (contain ":"), old gpt-3.5/gpt-4-* legacy, and non-chat models
+    const ALLOWED_PREFIXES = ["gpt-5", "gpt-4.1", "gpt-4o", "gpt-4.5", "gpt-4-turbo"];
+    const EXCLUDED_KEYWORDS = ["tts", "transcribe", "audio", "realtime", "search"];
+    const models = data.data
+      .map((m) => m.id)
+      .filter((id) =>
+        ALLOWED_PREFIXES.some((prefix) => id.startsWith(prefix))
+        && !id.includes(":")
+        && !EXCLUDED_KEYWORDS.some((kw) => id.includes(kw))
+      )
+      .sort((a, b) => b.localeCompare(a)); // reverse alpha: newest (4.5, 4.1) first
+    setAvailableModels(models);
+  }, []);
+
+  const fetchModels = useCallback(async (key: string) => {
+    try {
+      const response = await fetch("https://api.openai.com/v1/models", {
+        headers: { Authorization: `Bearer ${key}` },
+      });
+      if (response.ok) {
+        parseModels(await response.json());
+      }
+    } catch {
+      // silently fail — model list is best-effort
+    }
+  }, [parseModels]);
+
   const validateOpenaiApiKey = useDebounceWithImmediate(
     async (key: string) => {
       if (!key.trim()) {
@@ -211,7 +243,12 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
         const response = await fetch("https://api.openai.com/v1/models", {
           headers: { Authorization: `Bearer ${key}` },
         });
-        setApiKeyStatus(response.ok ? "valid" : "invalid");
+        if (response.ok) {
+          setApiKeyStatus("valid");
+          parseModels(await response.json());
+        } else {
+          setApiKeyStatus("invalid");
+        }
       } catch {
         setApiKeyStatus("invalid");
       }
@@ -230,6 +267,9 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
     // Skip validation when restoring from storage on mount
     if (apiKeyRestored) {
       setApiKeyStatus(displayApiKey.trim() ? "valid" : "idle");
+      if (displayApiKey.trim()) {
+        fetchModels(displayApiKey);
+      }
       setApiKeyRestored(false);
       return;
     }
@@ -342,6 +382,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
             }}
             isInterviewActive={interviewStarted}
             openaiApiKey={displayApiKey}
+            openaiModel={openaiModel}
           />
         </Stack>
 
@@ -480,6 +521,23 @@ Follow-ups
               <Option value="ko">한국어</Option>
             </Select>
           </Stack>
+
+          <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
+
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+            <Typography level="body-xs" sx={{ fontWeight: 700, color: "neutral.500", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.65rem" }}>
+              Model
+            </Typography>
+            <Select variant="plain" value={openaiModel} onChange={(_, value) => value && setOpenaiModel(value as string)} size="sm" sx={{ minWidth: { xs: 120, md: 160 } }}>
+              {availableModels.length > 0 ? (
+                availableModels.map((model) => (
+                  <Option key={model} value={model}>{model}</Option>
+                ))
+              ) : (
+                <Option value="gpt-4.1-nano">gpt-4.1-nano</Option>
+              )}
+            </Select>
+          </Stack>
         </Box>
 
         {/* Main Content Tabs */}
@@ -552,6 +610,7 @@ Follow-ups
                 onQuestionNumberIncrement={handleQuestionNumberIncrement}
                 followUpLimit={followUpLimit}
                 language={language}
+                openaiModel={openaiModel}
               />
             </TabPanel>
 

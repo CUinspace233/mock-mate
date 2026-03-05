@@ -50,6 +50,7 @@ export interface GenerateQuestionRequest {
   question_type: QuestionType;
   user_id: number;
   openai_api_key: string;
+  openai_model?: string;
   is_last_question?: boolean;
   language?: string;
 }
@@ -71,6 +72,7 @@ export interface EvaluateAnswerRequest {
   answer: string;
   session_id?: string;
   openai_api_key: string;
+  openai_model?: string;
 }
 
 // Follow-up conversation types
@@ -88,6 +90,7 @@ export interface FollowUpRequest {
   difficulty: string | null;
   user_id: number;
   openai_api_key: string;
+  openai_model?: string;
   language?: string;
 }
 
@@ -103,6 +106,7 @@ export interface EvaluateFollowUpRequest {
   conversation_history: ConversationEntry[];
   session_id?: string;
   openai_api_key: string;
+  openai_model?: string;
 }
 
 export interface EvaluationDetails {

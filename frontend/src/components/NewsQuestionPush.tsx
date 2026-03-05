@@ -12,6 +12,7 @@ interface NewsQuestionPushProps {
   onStartAnswering: (questionId: string, newsQuestion: NewsQuestion) => void;
   isInterviewActive: boolean;
   openaiApiKey: string;
+  openaiModel: string;
 }
 
 export default function NewsQuestionPush({
@@ -20,6 +21,7 @@ export default function NewsQuestionPush({
   onStartAnswering,
   isInterviewActive,
   openaiApiKey,
+  openaiModel,
 }: NewsQuestionPushProps) {
   const [currentQuestion, setCurrentQuestion] = useState<NewsQuestion | null>(null);
   const [showPushModal, setShowPushModal] = useState(false);
@@ -111,7 +113,7 @@ export default function NewsQuestionPush({
 
     try {
       // Trigger news fetch + question generation with user's API key
-      await fetchNewsManual(openaiApiKey);
+      await fetchNewsManual(openaiApiKey, openaiModel);
 
       const response = await getTrendingQuestions({
         position: selectedPosition,

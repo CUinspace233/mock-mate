@@ -67,6 +67,7 @@ interface InterviewChatProps {
   onQuestionNumberIncrement: () => void;
   followUpLimit: number;
   language: string;
+  openaiModel: string;
 }
 
 export default function InterviewChat({
@@ -92,6 +93,7 @@ export default function InterviewChat({
   onQuestionNumberIncrement,
   followUpLimit,
   language,
+  openaiModel,
 }: InterviewChatProps) {
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -137,6 +139,7 @@ export default function InterviewChat({
         question_type: questionType,
         user_id: user_id,
         openai_api_key: openaiApiKey,
+        openai_model: openaiModel,
         is_last_question: currentQuestionNumber + 1 >= questionCountTarget,
         language,
       };
@@ -215,6 +218,7 @@ export default function InterviewChat({
           question_type: questionType,
           user_id: user_id,
           openai_api_key: openaiApiKey,
+          openai_model: openaiModel,
           is_last_question: currentQuestionNumber + 1 >= questionCountTarget,
           language,
         };
@@ -290,6 +294,7 @@ export default function InterviewChat({
     setAwaitingAnswer,
     questionType,
     openaiApiKey,
+    openaiModel,
     onQuestionNumberIncrement,
     followUpLimit,
     currentQuestionNumber,
@@ -380,6 +385,7 @@ export default function InterviewChat({
         conversation_history: history,
         session_id: sessionId || undefined,
         openai_api_key: openaiApiKey,
+        openai_model: openaiModel,
       });
     } else {
       // Single-turn: evaluate just the answer
@@ -388,6 +394,7 @@ export default function InterviewChat({
         user_id: user_id,
         answer: answer,
         openai_api_key: openaiApiKey,
+        openai_model: openaiModel,
       });
     }
 
@@ -465,6 +472,7 @@ export default function InterviewChat({
         difficulty: selectedDifficulty,
         user_id: user_id,
         openai_api_key: openaiApiKey,
+        openai_model: openaiModel,
         language,
       },
       (delta: string) => {

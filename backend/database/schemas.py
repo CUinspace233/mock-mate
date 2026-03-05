@@ -92,6 +92,7 @@ class GenerateQuestionRequest(BaseModel):
     question_type: QuestionType | None = QuestionType.TECHNICAL
     user_id: int
     openai_api_key: str
+    openai_model: str = "gpt-4.1-nano"
     is_last_question: bool = False
     language: str = "en"
 
@@ -129,6 +130,7 @@ class GenerateFollowUpRequest(BaseModel):
     difficulty: str | None = "medium"
     user_id: int
     openai_api_key: str
+    openai_model: str = "gpt-4.1-nano"
     language: str = "en"
 
 
@@ -139,6 +141,7 @@ class EvaluateFollowUpRequest(BaseModel):
     conversation_history: list[ConversationEntry]
     session_id: str | None = None
     openai_api_key: str
+    openai_model: str = "gpt-4.1-nano"
 
 
 class EvaluateAnswerRequest(BaseModel):
@@ -147,6 +150,7 @@ class EvaluateAnswerRequest(BaseModel):
     answer: str
     session_id: str | None = None
     openai_api_key: str
+    openai_model: str = "gpt-4.1-nano"
 
 
 class EvaluationDetails(BaseModel):
@@ -442,6 +446,7 @@ class FetchNewsRequest(BaseModel):
     category: NewsCategory | None = None
     limit: int = 10
     openai_api_key: str = ""
+    openai_model: str = "gpt-4.1-nano"
 
 
 class FetchNewsResponse(BaseModel):

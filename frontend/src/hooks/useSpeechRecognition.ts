@@ -70,6 +70,14 @@ export function useSpeechRecognition({
   const isRecordingRef = useRef(false);
   const baseTextRef = useRef("");
 
+  // Store callbacks in refs so event handlers always use the latest versions
+  const onTranscriptRef = useRef(onTranscript);
+  onTranscriptRef.current = onTranscript;
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+  const getCurrentTextRef = useRef(getCurrentText);
+  getCurrentTextRef.current = getCurrentText;
+
   const stopRecording = useCallback(() => {
     isRecordingRef.current = false;
     setIsRecording(false);
@@ -98,7 +106,7 @@ export function useSpeechRecognition({
     recognition.interimResults = true;
     recognition.lang = language;
 
-    baseTextRef.current = getCurrentText();
+    baseTextRef.current = getCurrentTextRef.current();
 
     recognition.onresult = (event) => {
       let transcript = "";
@@ -110,13 +118,13 @@ export function useSpeechRecognition({
         }
       }
       const separator = baseTextRef.current ? " " : "";
-      onTranscript(baseTextRef.current + separator + transcript);
+      onTranscriptRef.current(baseTextRef.current + separator + transcript);
     };
 
     recognition.onend = () => {
       // Chrome stops after silence — auto-restart if still recording
       if (isRecordingRef.current) {
-        baseTextRef.current = getCurrentText();
+        baseTextRef.current = getCurrentTextRef.current();
         try {
           recognition.start();
         } catch {
@@ -135,7 +143,7 @@ export function useSpeechRecognition({
       };
       const message = errorMessages[event.error] ?? `Speech recognition error: ${event.error}`;
       if (message) {
-        onError(message);
+        onErrorRef.current(message);
       }
       stopRecording();
     };
@@ -148,9 +156,9 @@ export function useSpeechRecognition({
       recognition.start();
     } catch {
       stopRecording();
-      onError("Failed to start speech recognition.");
+      onErrorRef.current("Failed to start speech recognition.");
     }
-  }, [language, onTranscript, onError, getCurrentText, stopRecording]);
+  }, [language, stopRecording]);
 
   const toggleRecording = useCallback(() => {
     if (isRecordingRef.current) {

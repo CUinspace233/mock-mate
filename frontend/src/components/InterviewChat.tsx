@@ -14,6 +14,8 @@ import {
   Modal,
   ModalDialog,
   ModalClose,
+  IconButton,
+  Tooltip,
 } from "@mui/joy";
 import {
   Send as SendIcon,
@@ -23,7 +25,10 @@ import {
   CheckCircle as CheckIcon,
   Cancel as CancelIcon,
   ExitToApp as ExitIcon,
+  Mic as MicIcon,
+  Stop as StopIcon,
 } from "@mui/icons-material";
+import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
 import {
   generateQuestion as generateQuestionApi,
   generateQuestionStream as generateQuestionStreamApi,
@@ -111,6 +116,18 @@ export default function InterviewChat({
   const [mainQuestionContent, setMainQuestionContent] = useState("");
   const [mainQuestionId, setMainQuestionId] = useState<string | null>(null);
   const [isInFollowUpMode, setIsInFollowUpMode] = useState(false);
+
+  const { isRecording, isSupported, toggleRecording, stopRecording } = useSpeechRecognition({
+    language,
+    onTranscript: (text) => setCurrentAnswer(text),
+    onError: (msg) => setError(msg),
+    getCurrentText: () => currentAnswer,
+  });
+
+  // Stop recording when answer area hides
+  useEffect(() => {
+    if (!awaitingAnswer) stopRecording();
+  }, [awaitingAnswer, stopRecording]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -521,6 +538,7 @@ export default function InterviewChat({
   };
 
   const handleSendAnswer = async () => {
+    stopRecording();
     if (!currentAnswer.trim() || !currentQuestion) return;
 
     const answerText = currentAnswer;
@@ -870,12 +888,18 @@ export default function InterviewChat({
               </Alert>
             )}
             <Textarea
-              placeholder="Enter your answer here..."
+              placeholder={isRecording ? "Listening..." : "Enter your answer here..."}
               value={currentAnswer}
               onChange={(e) => setCurrentAnswer(e.target.value)}
               minRows={2}
               maxRows={8}
-              sx={{ width: "100%" }}
+              sx={{
+                width: "100%",
+                ...(isRecording && {
+                  borderColor: "danger.500",
+                  "&:focus-within": { borderColor: "danger.500" },
+                }),
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                   handleSendAnswer();
@@ -884,9 +908,29 @@ export default function InterviewChat({
             />
             <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
               <Typography level="body-xs" sx={{ color: "neutral.400", display: { xs: "none", sm: "block" } }}>
-                Ctrl/Cmd+Enter to send
+                Ctrl/Cmd+Enter to send{isSupported ? " · click mic to speak" : ""}
               </Typography>
               <Stack direction="row" spacing={1}>
+                {isSupported && (
+                  <Tooltip title={isRecording ? "Stop recording" : "Start voice input"}>
+                    <IconButton
+                      variant={isRecording ? "solid" : "outlined"}
+                      color={isRecording ? "danger" : "neutral"}
+                      size="sm"
+                      onClick={toggleRecording}
+                      disabled={isLoading}
+                      sx={isRecording ? {
+                        animation: "pulse 1.5s ease-in-out infinite",
+                        "@keyframes pulse": {
+                          "0%, 100%": { opacity: 1 },
+                          "50%": { opacity: 0.6 },
+                        },
+                      } : undefined}
+                    >
+                      {isRecording ? <StopIcon /> : <MicIcon />}
+                    </IconButton>
+                  </Tooltip>
+                )}
                 <Button
                   startDecorator={<ExitIcon />}
                   onClick={handleEndSession}

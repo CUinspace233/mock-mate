@@ -30,6 +30,8 @@ type AuthState = {
   logout: () => void;
 };
 
+let encryptVersion = 0;
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -50,7 +52,12 @@ export const useAuthStore = create<AuthState>()(
       setOpenaiModel: (model) => set({ openaiModel: model }),
       openaiApiKey: "",
       setOpenaiApiKey: (apiKey) => {
-        encryptApiKey(apiKey).then((encrypted) => set({ openaiApiKey: encrypted }));
+        const ver = ++encryptVersion;
+        encryptApiKey(apiKey).then((encrypted) => {
+          if (ver === encryptVersion) {
+            set({ openaiApiKey: encrypted });
+          }
+        });
       },
       getDecryptedApiKey: () => decryptApiKey(get().openaiApiKey),
       setDailyQuestionCount: (count) => set({ dailyQuestionCount: count }),

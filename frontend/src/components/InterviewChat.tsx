@@ -622,6 +622,7 @@ export default function InterviewChat({
   };
 
   const handleStartNewQuestion = async () => {
+    hasInitialized.current = true;
     await onInterviewStart();
     generateQuestion();
   };

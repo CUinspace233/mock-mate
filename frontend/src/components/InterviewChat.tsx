@@ -623,6 +623,7 @@ export default function InterviewChat({
 
   const handleStartNewQuestion = async () => {
     await onInterviewStart();
+    generateQuestion();
   };
 
   const handleCompleteInterview = async () => {

@@ -26,6 +26,7 @@ import {
   Check as CheckIcon,
   Cancel as CancelIcon,
   ArrowBack as ArrowBackIcon,
+  GitHub as GitHubIcon,
 } from "@mui/icons-material";
 import InterviewChat from "./InterviewChat.tsx";
 import InterviewHistory from "./InterviewHistory.tsx";
@@ -316,6 +317,17 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
             </Chip>
           </Stack>
           <Stack direction="row" spacing={0.5} alignItems="center">
+            <IconButton
+              component="a"
+              href="https://github.com/CUinspace233/mock-mate"
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="plain"
+              size="md"
+              sx={{ "& svg": { color: "#24292f" } }}
+            >
+              <GitHubIcon fontSize="medium" />
+            </IconButton>
             <Button
               variant="outlined"
               size="sm"

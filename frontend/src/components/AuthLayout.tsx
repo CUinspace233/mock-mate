@@ -1,8 +1,9 @@
-import { Box, Typography } from "@mui/joy";
+import { Box, IconButton, Typography } from "@mui/joy";
 import {
   AutoAwesome as AIIcon,
   BarChart as ChartIcon,
   TrackChanges as FeedbackIcon,
+  GitHub as GitHubIcon,
 } from "@mui/icons-material";
 
 interface AuthLayoutProps {
@@ -147,17 +148,35 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         </Box>
 
         {/* Trust line */}
-        <Typography
+        <Box
           sx={{
             position: "absolute",
             bottom: 32,
-            color: "rgba(255,255,255,0.35)",
-            fontSize: "0.75rem",
-            textAlign: "center",
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
           }}
         >
-          Trusted by candidates preparing for top tech companies
-        </Typography>
+          <Typography
+            sx={{
+              color: "rgba(255,255,255,0.35)",
+              fontSize: "0.75rem",
+            }}
+          >
+            Trusted by candidates preparing for top tech companies
+          </Typography>
+          <IconButton
+            component="a"
+            href="https://github.com/CUinspace233/mock-mate"
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="plain"
+            size="sm"
+            sx={{ "& svg": { color: "rgba(255,255,255,0.5)" }, "&:hover": { bgcolor: "transparent" }, "&:hover svg": { color: "#fff" } }}
+          >
+            <GitHubIcon fontSize="small" />
+          </IconButton>
+        </Box>
       </Box>
 
       {/* Right panel — form area */}

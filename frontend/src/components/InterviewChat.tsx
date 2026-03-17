@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import Markdown from "react-markdown";
 import {
   Box,
   Typography,
@@ -847,12 +848,33 @@ export default function InterviewChat({
                 ) : (
                 <Typography
                   level="body-md"
+                  component="div"
                   sx={{
-                    whiteSpace: "pre-wrap",
                     color: message.sender === "user" ? "primary.800" : "text.primary",
+                    "& p": { m: 0 },
+                    "& p + p": { mt: 1 },
+                    "& code": {
+                      bgcolor: "neutral.100",
+                      px: 0.5,
+                      py: 0.25,
+                      borderRadius: "4px",
+                      fontSize: "0.85em",
+                      fontFamily: "monospace",
+                    },
+                    "& pre": {
+                      bgcolor: "neutral.100",
+                      p: 1.5,
+                      borderRadius: "8px",
+                      overflow: "auto",
+                      my: 1,
+                    },
+                    "& pre code": {
+                      bgcolor: "transparent",
+                      p: 0,
+                    },
                   }}
                 >
-                  {message.content}
+                  <Markdown>{message.content}</Markdown>
                 </Typography>
                 )}
                 {message.score && (

@@ -36,6 +36,12 @@ class QuestionType(str, Enum):
     BEHAVIORAL = "behavioral"
 
 
+class QuestionStatus(str, Enum):
+    GENERATING = "generating"
+    COMPLETED = "completed"
+    INTERRUPTED = "interrupted"
+
+
 # User
 class UserBase(BaseModel):
     username: str
@@ -95,6 +101,7 @@ class GenerateQuestionRequest(BaseModel):
     openai_model: str = "gpt-4.1-nano"
     is_last_question: bool = False
     language: str = "en"
+    session_id: str | None = None
 
 
 class GenerateQuestionResponse(BaseModel):
@@ -115,6 +122,16 @@ class GeneratedQuestion(BaseModel):
     expected_keywords: list[str]
 
 
+class RecoverableQuestionResponse(BaseModel):
+    question_id: str
+    content: str
+    status: str
+    position: str
+    difficulty: str
+    question_type: str
+    created_at: datetime
+
+
 # Answer Evaluation
 class ConversationEntry(BaseModel):
     role: str  # "interviewer" or "candidate"
@@ -132,6 +149,7 @@ class GenerateFollowUpRequest(BaseModel):
     openai_api_key: str
     openai_model: str = "gpt-4.1-nano"
     language: str = "en"
+    session_id: str | None = None
 
 
 class EvaluateFollowUpRequest(BaseModel):

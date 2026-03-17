@@ -44,6 +44,12 @@ class Question(Base):
         String(20), default="technical"
     )  # opinion, technical, behavioral
     expected_keywords: Mapped[list[str]] = mapped_column(JSON)  # list of expected keywords
+    status: Mapped[str | None] = mapped_column(
+        String(20), nullable=True, default="completed"
+    )  # generating, completed, interrupted — NULL treated as completed
+    session_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("interview_sessions.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(default=datetime.now(UTC))
 
     # Relationships

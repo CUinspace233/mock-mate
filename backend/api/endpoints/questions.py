@@ -1,10 +1,15 @@
+import asyncio
 import json
-from datetime import UTC, datetime, timezone
+import logging
+import threading
+import time
+import uuid
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from openai import OpenAI
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_db
@@ -17,11 +22,15 @@ from database.schemas import (
     QuestionCategoriesResponse,
     QuestionCategory,
     QuestionOut,
+    QuestionStatus,
     QuestionType,
+    RecoverableQuestionResponse,
     TopicCount,
 )
+from database.session import AsyncSessionLocal
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 LANGUAGE_NAMES = {
     "en": "English",
@@ -50,6 +59,159 @@ def _lang_system(lang: str) -> str:
 def _get_client(api_key: str = "") -> OpenAI:
     """Create OpenAI client using provided key, fallback to env var."""
     return OpenAI(api_key=api_key) if api_key else OpenAI()
+
+
+# ---------------------------------------------------------------------------
+# Background generation infrastructure
+# ---------------------------------------------------------------------------
+
+
+class _GenerationState:
+    """Thread-safe shared state between the OpenAI thread, flush task, and SSE generator."""
+
+    def __init__(self):
+        self.deltas: list[str] = []
+        self.content: str = ""
+        self.done: bool = False
+        self.error: str | None = None
+        self.response_id: str | None = None
+        self._lock = threading.Lock()
+
+    def add_delta(self, delta: str):
+        with self._lock:
+            self.deltas.append(delta)
+            self.content += delta
+
+    def mark_done(self, content: str, response_id: str):
+        with self._lock:
+            self.content = content
+            self.response_id = response_id
+            self.done = True
+
+    def mark_error(self, error: str, partial_content: str):
+        with self._lock:
+            self.error = error
+            self.content = partial_content
+            self.done = True
+
+    def get_new_deltas(self, cursor: int) -> tuple[list[str], int]:
+        with self._lock:
+            new = self.deltas[cursor:]
+            return new, len(self.deltas)
+
+    def snapshot(self) -> tuple[str, bool, str | None, str | None]:
+        with self._lock:
+            return self.content, self.done, self.error, self.response_id
+
+
+def _run_openai_stream_in_thread(
+    client: OpenAI,
+    model: str,
+    instructions: str,
+    prompt: str,
+    max_output_tokens: int,
+    temperature: float,
+    state: _GenerationState,
+):
+    """Run the synchronous OpenAI streaming call in a background thread.
+
+    Writes deltas into the shared state object. On completion or error,
+    marks the state accordingly.
+    """
+    content = ""
+    try:
+        with client.responses.stream(
+            model=model,
+            instructions=instructions,
+            input=prompt,
+            max_output_tokens=max_output_tokens,
+            temperature=temperature,
+        ) as stream:
+            for event in stream:
+                if event.type == "response.output_text.delta" and event.delta:
+                    content += event.delta
+                    state.add_delta(event.delta)
+            final_response = stream.get_final_response()
+        state.mark_done(content, final_response.id)
+    except Exception as e:
+        logger.exception("OpenAI stream error")
+        state.mark_error(str(e), content)
+
+
+def _should_flush(content: str, last_flush_time: float) -> bool:
+    """Decide whether to flush accumulated content to DB.
+
+    Flush on sentence boundaries (. ? !) or if >1s since last flush.
+    """
+    if not content:
+        return False
+    elapsed = time.monotonic() - last_flush_time
+    # Sentence-boundary check
+    stripped = content.rstrip()
+    if stripped and stripped[-1] in ".?!。？！" and elapsed > 0.3:
+        return True
+    # Time-based floor
+    if elapsed >= 1.0:
+        return True
+    return False
+
+
+async def _bg_flush_task(question_id: str, state: _GenerationState):
+    """Background asyncio task: periodically flushes content to DB.
+
+    Continues running even if the SSE generator is cancelled (client disconnect).
+    """
+    last_flush = time.monotonic()
+    try:
+        while True:
+            await asyncio.sleep(0.2)
+            content, done, error, _ = state.snapshot()
+
+            if _should_flush(content, last_flush) or done:
+                try:
+                    async with AsyncSessionLocal() as flush_db:
+                        if done:
+                            final_status = (
+                                QuestionStatus.INTERRUPTED if error else QuestionStatus.COMPLETED
+                            )
+                            await flush_db.execute(
+                                update(models.Question)
+                                .where(models.Question.id == question_id)
+                                .values(
+                                    content=content.strip() if content else "",
+                                    status=final_status,
+                                )
+                            )
+                        else:
+                            await flush_db.execute(
+                                update(models.Question)
+                                .where(models.Question.id == question_id)
+                                .values(content=content.strip())
+                            )
+                        await flush_db.commit()
+                        last_flush = time.monotonic()
+                except Exception:
+                    logger.exception("Flush error for question %s", question_id)
+
+            if done:
+                break
+    except Exception:
+        logger.exception("Flush task fatal error for question %s", question_id)
+        try:
+            async with AsyncSessionLocal() as flush_db:
+                await flush_db.execute(
+                    update(models.Question)
+                    .where(models.Question.id == question_id)
+                    .values(status=QuestionStatus.INTERRUPTED)
+                )
+                await flush_db.commit()
+        except Exception:
+            logger.exception("Failed to mark question %s as interrupted", question_id)
+
+
+# ---------------------------------------------------------------------------
+# AI question generation (non-streaming)
+# ---------------------------------------------------------------------------
 
 
 async def generate_ai_question(
@@ -92,6 +254,11 @@ async def generate_ai_question(
     )
 
 
+# ---------------------------------------------------------------------------
+# Streaming endpoints
+# ---------------------------------------------------------------------------
+
+
 @router.post("/generate/stream")
 async def generate_question_stream(
     req: GenerateQuestionRequest, db: AsyncSession = Depends(get_db)
@@ -113,56 +280,76 @@ async def generate_question_stream(
             "or 'Describe your experience with...'. Return only the question." + lang_p
         )
 
+    instructions = (
+        "You are an expert interview question generator. "
+        "Always generate specific, knowledge-based questions that test concrete understanding. "
+        "Avoid broad, open-ended, or experience-based questions." + _lang_system(req.language)
+    )
+
+    # Create Question record immediately with status="generating"
+    question_id = str(uuid.uuid4())
+    question = models.Question(
+        id=question_id,
+        content="",
+        position=req.position,
+        difficulty=req.difficulty or "easy",
+        question_type=req.question_type,
+        expected_keywords=["technical", "explanation", "examples"],
+        status=QuestionStatus.GENERATING,
+        session_id=req.session_id,
+    )
+    db.add(question)
+    await db.commit()
+    created_at = question.created_at or datetime.now(UTC)
+
+    # Shared state: thread writes deltas, flush task + SSE generator read
+    state = _GenerationState()
+
+    # Start OpenAI stream in background thread
+    thread = threading.Thread(
+        target=_run_openai_stream_in_thread,
+        args=(client, req.openai_model, instructions, prompt, 100, 0.9, state),
+        daemon=True,
+    )
+    thread.start()
+
+    # Start background flush task (survives SSE disconnect)
+    asyncio.create_task(_bg_flush_task(question_id, state))
+
+    # SSE generator: reads from shared state, yields to client
     async def sse_iter():
-        content = ""
-        response_id = None
+        yield f"event: init\ndata: {json.dumps({'question_id': question_id})}\n\n"
 
-        with client.responses.stream(
-            model=req.openai_model,
-            instructions=(
-                "You are an expert interview question generator. "
-                "Always generate specific, knowledge-based questions that test concrete understanding. "
-                "Avoid broad, open-ended, or experience-based questions."
-                + _lang_system(req.language)
-            ),
-            input=prompt,
-            max_output_tokens=100,
-            temperature=0.9,
-        ) as stream:
-            for event in stream:
-                if event.type == "response.output_text.delta":
-                    delta = event.delta
-                    if not delta:
-                        continue
-                    content += delta
+        cursor = 0
+        while True:
+            new_deltas, cursor = state.get_new_deltas(cursor)
+            for delta in new_deltas:
+                yield f"event: content\ndata: {json.dumps({'delta': delta})}\n\n"
+
+            content, done, error, response_id = state.snapshot()
+            if done:
+                new_deltas, cursor = state.get_new_deltas(cursor)
+                for delta in new_deltas:
                     yield f"event: content\ndata: {json.dumps({'delta': delta})}\n\n"
-            final_response = stream.get_final_response()
-            response_id = final_response.id
 
-        # Save question to database so /answers/evaluate can find it
-        question = models.Question(
-            content=content.strip(),
-            position=req.position,
-            difficulty=req.difficulty or "easy",
-            question_type=req.question_type,
-            expected_keywords=["technical", "explanation", "examples"],
-        )
-        db.add(question)
-        await db.commit()
-        await db.refresh(question)
+                if error:
+                    yield f"event: error\ndata: {json.dumps({'error': error})}\n\n"
+                else:
+                    final = {
+                        "question_id": question_id,
+                        "content": content.strip(),
+                        "position": req.position,
+                        "difficulty": req.difficulty or "easy",
+                        "question_type": req.question_type,
+                        "expected_keywords": ["technical", "explanation", "examples"],
+                        "created_at": created_at.isoformat(),
+                        "response_id": response_id,
+                    }
+                    yield f"event: final\ndata: {json.dumps(final)}\n\n"
+                yield "event: end\ndata: {}\n\n"
+                break
 
-        final = {
-            "question_id": str(question.id),
-            "content": content.strip(),
-            "position": req.position,
-            "difficulty": req.difficulty or "easy",
-            "question_type": req.question_type,
-            "expected_keywords": ["technical", "explanation", "examples"],
-            "created_at": (question.created_at or datetime.now(timezone.utc)).isoformat(),
-            "response_id": response_id,
-        }
-        yield f"event: final\ndata: {json.dumps(final)}\n\n"
-        yield "event: end\ndata: {}\n\n"
+            await asyncio.sleep(0.05)
 
     return StreamingResponse(sse_iter(), media_type="text/event-stream")
 
@@ -190,60 +377,83 @@ async def generate_followup_stream(
         "Return only the follow-up question." + _lang_prompt(req.language)
     )
 
+    instructions = (
+        "You are an expert technical interviewer conducting a multi-round interview. "
+        "Generate specific, knowledge-based follow-up questions that probe concrete technical details "
+        "based on the candidate's previous answers. Avoid broad or open-ended questions."
+        + _lang_system(req.language)
+    )
+
+    # Create Question record immediately
+    question_id = str(uuid.uuid4())
+    question = models.Question(
+        id=question_id,
+        content="",
+        position=req.position,
+        difficulty=req.difficulty or "medium",
+        question_type=QuestionType.TECHNICAL,
+        expected_keywords=["depth", "understanding", "follow-up"],
+        status=QuestionStatus.GENERATING,
+        session_id=req.session_id,
+    )
+    db.add(question)
+    await db.commit()
+    created_at = question.created_at or datetime.now(UTC)
+
+    # Shared state: thread writes deltas, flush task + SSE generator read
+    state = _GenerationState()
+
+    thread = threading.Thread(
+        target=_run_openai_stream_in_thread,
+        args=(client, req.openai_model, instructions, prompt, 150, 0.7, state),
+        daemon=True,
+    )
+    thread.start()
+
+    asyncio.create_task(_bg_flush_task(question_id, state))
+
     async def sse_iter():
-        content = ""
-        response_id = None
+        yield f"event: init\ndata: {json.dumps({'question_id': question_id})}\n\n"
 
-        with client.responses.stream(
-            model=req.openai_model,
-            instructions=(
-                "You are an expert technical interviewer conducting a multi-round interview. "
-                "Generate specific, knowledge-based follow-up questions that probe concrete technical details "
-                "based on the candidate's previous answers. Avoid broad or open-ended questions."
-                + _lang_system(req.language)
-            ),
-            input=prompt,
-            max_output_tokens=150,
-            temperature=0.7,
-        ) as stream:
-            for event in stream:
-                if event.type == "response.output_text.delta":
-                    delta = event.delta
-                    if not delta:
-                        continue
-                    content += delta
+        cursor = 0
+        while True:
+            new_deltas, cursor = state.get_new_deltas(cursor)
+            for delta in new_deltas:
+                yield f"event: content\ndata: {json.dumps({'delta': delta})}\n\n"
+
+            content, done, error, response_id = state.snapshot()
+            if done:
+                new_deltas, cursor = state.get_new_deltas(cursor)
+                for delta in new_deltas:
                     yield f"event: content\ndata: {json.dumps({'delta': delta})}\n\n"
-            final_response = stream.get_final_response()
-            response_id = final_response.id
 
-        # Save follow-up question to database
-        question = models.Question(
-            content=content.strip(),
-            position=req.position,
-            difficulty=req.difficulty or "medium",
-            question_type=QuestionType.TECHNICAL,
-            expected_keywords=["depth", "understanding", "follow-up"],
-        )
-        db.add(question)
-        await db.commit()
-        await db.refresh(question)
+                if error:
+                    yield f"event: error\ndata: {json.dumps({'error': error})}\n\n"
+                else:
+                    final = {
+                        "question_id": question_id,
+                        "content": content.strip(),
+                        "position": req.position,
+                        "difficulty": req.difficulty or "medium",
+                        "question_type": QuestionType.TECHNICAL,
+                        "expected_keywords": ["depth", "understanding", "follow-up"],
+                        "created_at": created_at.isoformat(),
+                        "response_id": response_id,
+                        "is_follow_up": True,
+                        "follow_up_number": req.follow_up_number,
+                    }
+                    yield f"event: final\ndata: {json.dumps(final)}\n\n"
+                yield "event: end\ndata: {}\n\n"
+                break
 
-        final = {
-            "question_id": str(question.id),
-            "content": content.strip(),
-            "position": req.position,
-            "difficulty": req.difficulty or "medium",
-            "question_type": QuestionType.TECHNICAL,
-            "expected_keywords": ["depth", "understanding", "follow-up"],
-            "created_at": (question.created_at or datetime.now(timezone.utc)).isoformat(),
-            "response_id": response_id,
-            "is_follow_up": True,
-            "follow_up_number": req.follow_up_number,
-        }
-        yield f"event: final\ndata: {json.dumps(final)}\n\n"
-        yield "event: end\ndata: {}\n\n"
+            await asyncio.sleep(0.05)
 
     return StreamingResponse(sse_iter(), media_type="text/event-stream")
+
+
+# ---------------------------------------------------------------------------
+# Non-streaming generation
+# ---------------------------------------------------------------------------
 
 
 @router.post("/generate", response_model=GenerateQuestionResponse)
@@ -267,6 +477,8 @@ async def generate_question(
             difficulty=question_data.difficulty,
             question_type=question_data.question_type,
             expected_keywords=question_data.expected_keywords,
+            status=QuestionStatus.COMPLETED,
+            session_id=request.session_id,
         )
 
         db.add(question)
@@ -288,6 +500,73 @@ async def generate_question(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate question: {str(e)}",
         )
+
+
+# ---------------------------------------------------------------------------
+# Recovery endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/recover")
+async def recover_questions(
+    session_id: str = Query(...),
+    include_completed: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+) -> list[RecoverableQuestionResponse]:
+    """Find questions for a session. By default only interrupted/generating; pass include_completed=true to get all."""
+    if include_completed:
+        status_filter = or_(
+            models.Question.status == QuestionStatus.GENERATING,
+            models.Question.status == QuestionStatus.INTERRUPTED,
+            models.Question.status == QuestionStatus.COMPLETED,
+        )
+    else:
+        status_filter = or_(
+            models.Question.status == QuestionStatus.GENERATING,
+            models.Question.status == QuestionStatus.INTERRUPTED,
+        )
+    stmt = (
+        select(models.Question)
+        .where(
+            models.Question.session_id == session_id,
+            status_filter,
+        )
+        .order_by(models.Question.created_at.asc())
+    )
+    result = await db.execute(stmt)
+    questions = result.scalars().all()
+
+    return [
+        RecoverableQuestionResponse(
+            question_id=str(q.id),
+            content=q.content or "",
+            status=q.status or "completed",
+            position=q.position,
+            difficulty=q.difficulty or "medium",
+            question_type=q.question_type or "technical",
+            created_at=q.created_at or datetime.now(UTC),
+        )
+        for q in questions
+    ]
+
+
+@router.post("/{question_id}/discard")
+async def discard_question(
+    question_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Discard an interrupted question."""
+    stmt = (
+        update(models.Question).where(models.Question.id == question_id).values(status="discarded")
+    )
+    await db.execute(stmt)
+    await db.commit()
+    return {"message": "Question discarded"}
+
+
+# ---------------------------------------------------------------------------
+# Other endpoints
+# ---------------------------------------------------------------------------
 
 
 @router.get("/categories", response_model=QuestionCategoriesResponse)

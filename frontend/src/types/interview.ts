@@ -53,6 +53,7 @@ export interface GenerateQuestionRequest {
   openai_model?: string;
   is_last_question?: boolean;
   language?: string;
+  session_id?: string;
 }
 
 export interface GenerateQuestionResponse {
@@ -92,6 +93,7 @@ export interface FollowUpRequest {
   openai_api_key: string;
   openai_model?: string;
   language?: string;
+  session_id?: string;
 }
 
 export interface FollowUpStreamResponse extends GenerateQuestionResponse {
@@ -268,3 +270,13 @@ export interface GetProgressResponse {
 }
 
 export type NewsCategory = "ai" | "web_dev" | "mobile" | "devops" | "general_tech";
+
+export interface RecoverableQuestion {
+  question_id: string;
+  content: string;
+  status: "generating" | "interrupted";
+  position: string;
+  difficulty: string;
+  question_type: string;
+  created_at: string;
+}

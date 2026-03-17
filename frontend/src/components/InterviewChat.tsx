@@ -54,6 +54,7 @@ interface InterviewChatProps {
   selectedDifficulty: Difficulty;
   user_id: number;
   interviewStarted: boolean;
+  isRecoveredSession?: boolean;
   sessionId: string | null;
   onInterviewComplete: () => Promise<void>;
   onInterviewStart: () => Promise<void>;
@@ -80,6 +81,7 @@ export default function InterviewChat({
   selectedDifficulty,
   user_id,
   interviewStarted,
+  isRecoveredSession,
   sessionId,
   onInterviewComplete,
   onInterviewStart,
@@ -102,6 +104,8 @@ export default function InterviewChat({
 }: InterviewChatProps) {
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
   const [isCompletingInterview, setIsCompletingInterview] = useState(false);
   const [error, setError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -148,6 +152,7 @@ export default function InterviewChat({
   const generateQuestion = useCallback(async () => {
     setIsLoading(true);
     setError("");
+    const currentPlaceholderId = `temp-question-${Date.now()}`;
 
     try {
       const req: GenerateQuestionRequest = {
@@ -159,12 +164,12 @@ export default function InterviewChat({
         openai_model: openaiModel,
         is_last_question: currentQuestionNumber + 1 >= questionCountTarget,
         language,
+        session_id: sessionIdRef.current || undefined,
       };
 
       // Insert a placeholder AI message to stream into
-      const placeholderId = `temp-question-${Date.now()}`;
       const placeholderMessage: Message = {
-        id: placeholderId,
+        id: currentPlaceholderId,
         sender: "ai",
         content: "",
         timestamp: new Date(),
@@ -174,23 +179,30 @@ export default function InterviewChat({
       let firstDeltaHandled = false;
 
       // Try streaming first
-      const finalData = await generateQuestionStreamApi(req, (delta: string) => {
-        if (!firstDeltaHandled) {
-          firstDeltaHandled = true;
-          // Hide spinner once we start receiving content
-          setIsLoading(false);
-        }
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === placeholderId ? { ...m, content: (m.content || "") + delta } : m,
-          ),
-        );
-      });
+      const finalData = await generateQuestionStreamApi(
+        req,
+        (delta: string) => {
+          if (!firstDeltaHandled) {
+            firstDeltaHandled = true;
+            setIsLoading(false);
+          }
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === currentPlaceholderId ? { ...m, content: (m.content || "") + delta } : m,
+            ),
+          );
+        },
+        () => {
+          // init event received — question_id is available but we don't change
+          // the placeholder ID here to avoid race conditions with delta updates.
+          // The real ID will be set when the final event arrives.
+        },
+      );
 
       // Finalize the streamed message with server-provided id and timestamp
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === placeholderId
+          m.id === currentPlaceholderId
             ? {
                 ...m,
                 id: finalData.question_id,
@@ -238,16 +250,19 @@ export default function InterviewChat({
           openai_model: openaiModel,
           is_last_question: currentQuestionNumber + 1 >= questionCountTarget,
           language,
+          session_id: sessionIdRef.current || undefined,
         };
 
         const data = await generateQuestionApi(req);
 
         // Replace the placeholder (if exists) or append new message
         setMessages((prev) => {
-          const hasPlaceholder = prev.some((m) => m.id.startsWith("temp-question-"));
+          const hasPlaceholder = prev.some(
+            (m) => m.id === currentPlaceholderId || m.id.startsWith("temp-question-"),
+          );
           const next = hasPlaceholder
             ? prev.map((m) =>
-                m.id.startsWith("temp-question-")
+                m.id === currentPlaceholderId || m.id.startsWith("temp-question-")
                   ? {
                       ...m,
                       id: data.question_id,
@@ -290,7 +305,9 @@ export default function InterviewChat({
         }
       } catch (fallbackErr: unknown) {
         // Remove placeholder if present
-        setMessages((prev) => prev.filter((m) => !m.id.startsWith("temp-question-")));
+        setMessages((prev) =>
+          prev.filter((m) => m.id !== currentPlaceholderId && !m.id.startsWith("temp-question-")),
+        );
         if (fallbackErr instanceof Error) {
           setError(fallbackErr.message);
         } else if (err instanceof Error) {
@@ -367,6 +384,11 @@ export default function InterviewChat({
       hasInitialized.current = false;
       return;
     }
+    // Skip auto-generation when recovering a session (messages already restored)
+    if (isRecoveredSession) {
+      hasInitialized.current = true;
+      return;
+    }
     if (messages.length === 0 && !hasInitialized.current) {
       hasInitialized.current = true;
       if (presetQuestion) {
@@ -375,7 +397,7 @@ export default function InterviewChat({
         generateQuestion();
       }
     }
-  }, [interviewStarted, messages.length, presetQuestion, processPresetQuestion, generateQuestion]);
+  }, [interviewStarted, isRecoveredSession, messages.length, presetQuestion, processPresetQuestion, generateQuestion]);
 
   const resetFollowUpState = () => {
     setFollowUpCount(0);
@@ -400,7 +422,7 @@ export default function InterviewChat({
         user_id: user_id,
         original_question: mainQuestionContent,
         conversation_history: history,
-        session_id: sessionId || undefined,
+        session_id: sessionIdRef.current || undefined,
         openai_api_key: openaiApiKey,
         openai_model: openaiModel,
       });
@@ -449,7 +471,7 @@ export default function InterviewChat({
       score: evaluationMessage.score || 0,
       feedback: evaluationContent,
       position: presetQuestion?.position || selectedPosition,
-      session_id: sessionId || null,
+      session_id: sessionIdRef.current || null,
       question_id: questionId,
       user_id: user_id,
       evaluation_details: evaluationMessage.evaluation_details || {
@@ -491,6 +513,7 @@ export default function InterviewChat({
         openai_api_key: openaiApiKey,
         openai_model: openaiModel,
         language,
+        session_id: sessionIdRef.current || undefined,
       },
       (delta: string) => {
         if (!firstDeltaHandled) {
@@ -694,7 +717,13 @@ export default function InterviewChat({
         <Button
           size="lg"
           startDecorator={isLoading ? undefined : <PlayArrowIcon />}
-          onClick={handleStartNewQuestion}
+          onClick={() => {
+            if (!openaiApiKey.trim()) {
+              setError("Please enter your OpenAI API key above before starting an interview.");
+              return;
+            }
+            handleStartNewQuestion();
+          }}
           loading={isLoading}
           disabled={isLoading}
           sx={{
@@ -711,6 +740,11 @@ export default function InterviewChat({
         >
           {isLoading ? "Generating..." : "Start Interview"}
         </Button>
+        {error && (
+          <Alert color="danger" variant="soft" sx={{ mt: 2, maxWidth: 400, mx: "auto" }}>
+            {error}
+          </Alert>
+        )}
       </Box>
     );
   }

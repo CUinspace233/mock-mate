@@ -2,10 +2,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text, update
 
 from api.endpoints import answers, questions, sessions, trending, user
-from database.models import Base
-from database.session import engine
+from database.models import Base, Question
+from database.session import AsyncSessionLocal, engine
 from scheduler import start_scheduler
 
 scheduler = None
@@ -16,6 +17,24 @@ async def lifespan(app: FastAPI):
     global scheduler
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+        # Add new columns to existing tables (SQLite ALTER TABLE)
+        # create_all only creates new tables, not new columns on existing ones.
+        for col_sql in [
+            "ALTER TABLE questions ADD COLUMN status VARCHAR(20) DEFAULT 'completed'",
+            "ALTER TABLE questions ADD COLUMN session_id VARCHAR REFERENCES interview_sessions(id)",
+        ]:
+            try:
+                await conn.execute(text(col_sql))
+            except Exception:
+                pass  # Column already exists
+
+    # Mark any questions stuck in "generating" (from a previous crash) as interrupted
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            update(Question).where(Question.status == "generating").values(status="interrupted")
+        )
+        await db.commit()
 
     scheduler = start_scheduler()
     print("🚀 News scheduler started!")

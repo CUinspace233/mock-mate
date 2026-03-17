@@ -19,6 +19,7 @@ import type {
   UserPreferences,
   NewsCategory,
   GetProgressResponse,
+  RecoverableQuestion,
 } from "../types/interview";
 
 export async function login(username: string, password: string) {
@@ -48,6 +49,7 @@ export async function generateQuestion(
 export async function generateQuestionStream(
   request: GenerateQuestionRequest,
   onDelta: (delta: string) => void,
+  onInit?: (questionId: string) => void,
 ): Promise<GenerateQuestionResponse> {
   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/questions/generate/stream`, {
     method: "POST",
@@ -78,6 +80,7 @@ export async function generateQuestionStream(
       const payload = JSON.parse(dataLine.slice(6));
       const evt = eventLine ? eventLine.slice(7) : "message";
 
+      if (evt === "init" && payload.question_id && onInit) onInit(payload.question_id);
       if (evt === "content" && payload.delta) onDelta(payload.delta);
       if (evt === "final") final = payload as GenerateQuestionResponse;
     }
@@ -97,6 +100,7 @@ export async function evaluateAnswer(
 export async function generateFollowUpStream(
   request: FollowUpRequest,
   onDelta: (delta: string) => void,
+  onInit?: (questionId: string) => void,
 ): Promise<FollowUpStreamResponse> {
   const res = await fetch(
     `${import.meta.env.VITE_API_URL}/api/questions/generate/followup/stream`,
@@ -130,6 +134,7 @@ export async function generateFollowUpStream(
       const payload = JSON.parse(dataLine.slice(6));
       const evt = eventLine ? eventLine.slice(7) : "message";
 
+      if (evt === "init" && payload.question_id && onInit) onInit(payload.question_id);
       if (evt === "content" && payload.delta) onDelta(payload.delta);
       if (evt === "final") final = payload as FollowUpStreamResponse;
     }
@@ -255,4 +260,20 @@ export async function getUserProgress(
     `${import.meta.env.VITE_API_URL}/api/users/${userId}/progress?${searchParams.toString()}`,
   );
   return res.data;
+}
+
+export async function recoverQuestions(
+  sessionId: string,
+  includeCompleted = false,
+): Promise<RecoverableQuestion[]> {
+  const params = new URLSearchParams({ session_id: sessionId });
+  if (includeCompleted) params.append("include_completed", "true");
+  const res = await axios.get(
+    `${import.meta.env.VITE_API_URL}/api/questions/recover?${params.toString()}`,
+  );
+  return res.data;
+}
+
+export async function discardQuestion(questionId: string): Promise<void> {
+  await axios.post(`${import.meta.env.VITE_API_URL}/api/questions/${questionId}/discard`);
 }

@@ -31,7 +31,12 @@ import {
 import InterviewChat from "./InterviewChat.tsx";
 import InterviewHistory from "./InterviewHistory.tsx";
 import ProgressChart from "./ProgressChart.tsx";
-import { startInterviewSession, completeSession } from "../api/api";
+import {
+  startInterviewSession,
+  completeSession,
+  getSessionDetail,
+  recoverQuestions,
+} from "../api/api";
 import type { Message } from "../types/interview.ts";
 import { Difficulty, QuestionType } from "../types/interview";
 import { getDifficultyColor } from "../utils";
@@ -104,6 +109,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const [customPositionInput, setCustomPositionInput] = useState("");
   const [activeTab, setActiveTab] = useState<number>(0);
   const [interviewStarted, setInterviewStarted] = useState<boolean>(false);
+  const [isRecoveredSession, setIsRecoveredSession] = useState(false);
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>(Difficulty.EASY);
   const [selectedQuestionType, setSelectedQuestionType] = useState<QuestionType>(
     QuestionType.TECHNICAL,
@@ -128,8 +134,32 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
       setDailyQuestionDate(today);
     }
     if (sessionId && !interviewStarted) {
+      // Try to recover the session instead of completing it
       (async () => {
-        await handleInterviewComplete(sessionId);
+        try {
+          const detail = await getSessionDetail(sessionId);
+          if (detail.status === "active") {
+            // Session is still active — recover completed questions
+            const recovered = await recoverQuestions(sessionId, true);
+            const questionsWithContent = recovered.filter((q) => q.content);
+            const restoredMessages: Message[] = questionsWithContent.map((q) => ({
+              id: q.question_id,
+              sender: "ai" as const,
+              content: q.content,
+              timestamp: new Date(q.created_at),
+            }));
+            setMessages(restoredMessages);
+            setCurrentQuestionNumber(questionsWithContent.length);
+            setIsRecoveredSession(true);
+            setInterviewStarted(true);
+          } else {
+            // Session already completed — clear stale sessionId
+            setSessionId(null);
+          }
+        } catch {
+          // Session not found or error — clear stale sessionId
+          setSessionId(null);
+        }
       })();
     }
     // eslint-disable-next-line
@@ -147,6 +177,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
         position: selectedPosition,
       });
       setSessionId(res.session_id);
+      setIsRecoveredSession(false);
       setInterviewStarted(true);
     } catch (err) {
       console.error(err);
@@ -604,6 +635,7 @@ Follow-ups
                 selectedDifficulty={selectedDifficulty}
                 user_id={user_id || 0}
                 interviewStarted={interviewStarted}
+                isRecoveredSession={isRecoveredSession}
                 sessionId={sessionId}
                 onInterviewComplete={handleInterviewComplete}
                 onInterviewStart={handleStartInterview}

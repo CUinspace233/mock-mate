@@ -5,3 +5,6 @@
 
 .agents
 .claude
+backend/database/mockmate.db
+backend/database/*.db-wal
+backend/database/*.db-shm

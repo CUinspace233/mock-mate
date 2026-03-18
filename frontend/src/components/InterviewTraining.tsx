@@ -3,7 +3,6 @@ import {
   Box,
   Card,
   Typography,
-  Button,
   Select,
   Option,
   Tabs,
@@ -18,6 +17,10 @@ import {
   CircularProgress,
   Divider,
   IconButton,
+  Dropdown,
+  Menu,
+  MenuButton,
+  MenuItem,
 } from "@mui/joy";
 import {
   Chat as ChatIcon,
@@ -27,6 +30,8 @@ import {
   Cancel as CancelIcon,
   ArrowBack as ArrowBackIcon,
   GitHub as GitHubIcon,
+  Person as PersonIcon,
+  Logout as LogoutIcon,
 } from "@mui/icons-material";
 import InterviewChat from "./InterviewChat.tsx";
 import InterviewHistory from "./InterviewHistory.tsx";
@@ -204,11 +209,6 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
     setSessionId(null);
   };
 
-  const resetDailyProgress = () => {
-    setDailyQuestionCount(0);
-    setDailyQuestionDate(new Date().toISOString().slice(0, 10));
-  };
-
   const handleStartInterviewWithNews = async (newsQuestion?: NewsQuestion) => {
     try {
       const res = await startInterviewSession({
@@ -359,22 +359,26 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
             >
               <GitHubIcon fontSize="medium" />
             </IconButton>
-            <Button
-              variant="outlined"
-              size="sm"
-              onClick={resetDailyProgress}
-              sx={{ display: { xs: "none", sm: "inline-flex" } }}
-            >
-              Reset
-            </Button>
-            <Button
-              variant="soft"
-              color="danger"
-              size="sm"
-              onClick={onLogout}
-            >
-              Logout
-            </Button>
+            <Dropdown>
+              <MenuButton
+                variant="outlined"
+                size="sm"
+                startDecorator={<PersonIcon sx={{ fontSize: 16 }} />}
+                sx={{
+                  fontWeight: 500,
+                  borderColor: "neutral.300",
+                  "&:hover": { borderColor: "neutral.400", bgcolor: "neutral.50" },
+                }}
+              >
+                {username}
+              </MenuButton>
+              <Menu placement="bottom-end" size="sm" sx={{ minWidth: 140, p: 0 }}>
+                <MenuItem color="danger" onClick={onLogout}>
+                  <LogoutIcon sx={{ fontSize: 16, mr: 1 }} />
+                  Logout
+                </MenuItem>
+              </Menu>
+            </Dropdown>
           </Stack>
         </Stack>
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-MockMate is a comprehensive interview practice platform that simulates real-world technical interviews. The system combines AI-powered question generation, automated answer evaluation, and trending news-based interview questions to provide an up-to-date and realistic interview experience.
+MockMate is a comprehensive interview practice platform that simulates real-world technical interviews. The system combines AI-powered question generation with incremental streaming persistence, automated answer evaluation, multi-turn follow-up conversations, and trending news-based interview questions to provide an up-to-date and realistic interview experience.
 
 ## System Architecture
 
@@ -13,12 +13,15 @@ MockMate is a comprehensive interview practice platform that simulates real-worl
 1. **FastAPI Application** (`main.py`)
    - CORS enabled
    - Lifecycle management for database initialization and scheduler startup
+   - Startup migration: ALTER TABLE for schema evolution on existing SQLite databases
+   - Stale question cleanup: marks any `status="generating"` questions as `"interrupted"` on startup (crash recovery)
    - Modular router-based architecture
 
 2. **Database Layer**
    - **SQLAlchemy ORM** with async support
    - **SQLite database** (`mockmate.db`) for data persistence
    - Comprehensive schema with proper relationships
+   - No migration system — uses `Base.metadata.create_all()` with manual ALTER TABLE for new columns
 
 #### Key Data Models
 
@@ -29,7 +32,7 @@ MockMate is a comprehensive interview practice platform that simulates real-worl
 2. **Interview System**
    - `InterviewSession`: Tracks interview sessions with status and timing
    - `InterviewRecord`: Individual question-answer pairs with evaluation
-   - `Question`: Core question repository with metadata
+   - `Question`: Core question repository with metadata, `status` field (`generating`/`completed`/`interrupted`/`discarded`), and `session_id` FK linking to `InterviewSession`
    - `AnswerEvaluation`: Detailed answer assessment results
 
 3. **News Integration**
@@ -46,29 +49,92 @@ MockMate is a comprehensive interview practice platform that simulates real-worl
 - Performance analytics with position-based breakdown
 
 **Questions** (`/api/questions`)
-- AI-powered question generation using OpenAI GPT-4o-mini
+- AI-powered question generation using OpenAI Responses API (configurable model, default `gpt-4.1-nano`)
+- Streaming generation via SSE with background persistence (`/generate/stream`)
+- Follow-up question generation based on conversation history (`/generate/followup/stream`)
+- Non-streaming fallback generation (`/generate`)
 - Question categorization by position and difficulty
-- Question-type-based question filtering (Technical, Behavioral, Opinion)
-- Integration with news-based questions
+- Question recovery for interrupted sessions (`/recover`)
+- Question discard for abandoned generations (`/{question_id}/discard`)
 
 **Answers** (`/api/answers`)
-- AI-powered answer evaluation using OpenAI GPT-4o-mini
-- Comprehensive scoring (technical accuracy, clarity, completeness)
+- AI-powered answer evaluation using OpenAI Responses API with structured JSON output
+- Single-turn evaluation (`/evaluate`) and multi-turn follow-up evaluation (`/evaluate/followup`)
+- Comprehensive scoring (technical accuracy, clarity, completeness, practical experience)
 - Detailed feedback with strengths and improvement areas
 - Keyword coverage analysis
-- Fallback to mock evaluation if AI fails
 
 **Sessions** (`/api/sessions`)
-- Interview session lifecycle management
+- Interview session lifecycle management (start → active → completed)
 - Session completion with summary generation
+- Session detail retrieval for recovery
 - Performance tracking across sessions
-- Session-based answer organization
 
 **Trending Questions** (`/api/trending`)
 - News fetching from multiple RSS sources (Google News, Hacker News)
 - AI-powered question generation from current events
 - Relevance scoring and question type classification
 - Category-based news processing (AI, Web Dev, Mobile, DevOps)
+
+### Streaming Question Generation Architecture
+
+The streaming system decouples the OpenAI generation from the SSE client connection, enabling **incremental persistence** and **server-side continuation** even when the client disconnects.
+
+#### Components
+
+```
+[Background Thread]          [Async Flush Task]          [SSE Generator]
+  OpenAI stream       →     _GenerationState      ←     reads & yields
+  writes deltas              (thread-safe)               to client
+                                   ↓
+                             Periodic DB flush
+                             (sentence boundaries
+                              or every ~1s)
+```
+
+1. **`_GenerationState`**: Thread-safe shared state (deltas list, accumulated content, done/error flags, response_id) protected by `threading.Lock`
+2. **`_run_openai_stream_in_thread()`**: Runs the synchronous `client.responses.stream()` in a daemon thread; writes deltas into shared state
+3. **`_bg_flush_task()`**: `asyncio.create_task` that periodically flushes content to DB via its own `AsyncSessionLocal` session. **Survives SSE client disconnect.** Flush triggers on sentence boundaries (`.?!。？！`) or time-based floor (≥1s)
+4. **SSE Generator** (`sse_iter()`): Polls shared state every 50ms, yields deltas as SSE events. Cancellation-safe — if the client disconnects, the thread and flush task continue independently
+
+#### SSE Event Protocol
+
+```
+event: init       → {"question_id": "uuid"}        # Sent immediately after DB insert
+event: content    → {"delta": "text chunk"}         # Repeated for each token
+event: final      → {full question metadata}        # After generation completes
+event: error      → {"error": "message"}            # On failure
+event: end        → {}                              # Stream termination
+```
+
+#### Question Lifecycle
+
+```
+[DB INSERT status=generating, content=""]
+  → incremental content flushes (sentence/time boundaries)
+  → [stream completes] → status=completed, full content
+  → [stream errors]    → status=interrupted, partial content
+  → [server restart]   → startup cleanup marks as interrupted
+```
+
+### Session Recovery
+
+When a user refreshes or returns to the page:
+
+1. **Frontend** detects `sessionId` in Zustand (persisted to localStorage) but `interviewStarted=false`
+2. Calls `GET /api/sessions/{sessionId}` to check if session is still `active`
+3. If active: calls `GET /api/questions/recover?session_id=xxx&include_completed=true` to fetch all questions
+4. Restores messages from completed questions, sets `isRecoveredSession=true` to skip auto-generation
+5. If session completed or not found: clears stale `sessionId`
+
+### Follow-up Conversation System
+
+After answering a question, the system can generate follow-up questions that probe deeper:
+
+1. **Conversation history** is tracked client-side as `ConversationEntry[]` (role: interviewer/candidate)
+2. Follow-ups are generated via `/generate/followup/stream` with full conversation context
+3. Each follow-up is a separate `Question` record linked to the same session
+4. After reaching the follow-up limit, a comprehensive multi-turn evaluation is performed via `/evaluate/followup`
 
 ### Scheduled Tasks Logic
 
@@ -81,7 +147,7 @@ MockMate is a comprehensive interview practice platform that simulates real-worl
 
 **Execution Flow:**
 1. **Trigger**: Every 4 hours automatically
-2. **News Fetching**: 
+2. **News Fetching**:
    - Fetches from predefined RSS sources by category
    - Handles multiple source types (RSS feeds, APIs)
    - Parses content with proper error handling
@@ -97,7 +163,7 @@ MockMate is a comprehensive interview practice platform that simulates real-worl
 **News Sources Configuration:**
 - **AI Category**: Google News AI feeds, Hacker News API
 - **Web Development**: Google News with web tech keywords
-- **Mobile Development**: React Native, Flutter focused feeds  
+- **Mobile Development**: React Native, Flutter focused feeds
 - **DevOps**: Docker, Kubernetes, cloud infrastructure news
 
 ### Frontend (React + TypeScript + Joy UI)
@@ -107,17 +173,18 @@ MockMate is a comprehensive interview practice platform that simulates real-worl
 - **Vite** for build tooling and development
 - **Zustand** for client-side state management and persistence
 - **Joy UI** for UI components
+- **react-markdown** for AI message rendering (inline code, code blocks, lists, emphasis)
 
 #### Key Components
 
 1. **Authentication Flow**
-   - `AuthWrapper`: Main authentication container
+   - `AuthLayout`: Shared branded layout for login/register with feature highlights and GitHub link
    - `LoginPage` / `RegisterPage`: User authentication forms
    - Session management via Zustand
 
 2. **Interview Experience**
-   - `InterviewChat`: Real-time interview simulation interface
-   - `InterviewTraining`: Practice mode with immediate feedback
+   - `InterviewChat`: Real-time interview simulation with SSE streaming, markdown rendering, follow-up conversations, and session recovery
+   - `InterviewTraining`: Practice mode orchestrator — manages session lifecycle, recovery on page load, position/difficulty selection, API key validation
    - `InterviewHistory`: Past performance review and analytics
 
 3. **News Integration**
@@ -129,6 +196,13 @@ MockMate is a comprehensive interview practice platform that simulates real-worl
    - `ProgressChart`: Visual performance tracking
    - `InterviewRecordDetailsModal`: Detailed answer analysis
    - Position-based progress breakdown
+
+#### Key Frontend Patterns
+
+- **`sessionIdRef` pattern**: Uses `useRef` to track the latest `sessionId` across closures, avoiding stale closure issues in `useCallback`-based generation functions
+- **`isRecoveredSession` flag**: Prevents auto-generation of new questions when restoring a session from the server
+- **Placeholder message pattern**: Creates `temp-question-{timestamp}` messages for streaming, replaces with real `question_id` on `final` event
+- **API key validation**: Blocks interview start with inline error when OpenAI API key is missing
 
 #### Push Notification System
 
@@ -156,43 +230,63 @@ MockMate is a comprehensive interview practice platform that simulates real-worl
 
 #### Data Flow Patterns
 
-1. **Question Generation Flow**:
+1. **Streaming Question Generation Flow**:
    ```
-   User Request → Position/Difficulty/Question Type Selection → AI API Call → 
-   Question Storage → Response to Frontend
+   User Request → DB INSERT (status=generating) → Background Thread (OpenAI stream)
+     → Shared State (deltas) → SSE Generator (yields to client)
+     → Background Flush Task (periodic DB updates)
+     → Final: status=completed, full content persisted
    ```
 
-2. **Answer Evaluation Flow**:
+2. **Follow-up Conversation Flow**:
    ```
-   User Answer → Question Context → AI Evaluation → 
+   Initial Question → User Answer → Follow-up Generation (with conversation history)
+     → User Answer → ... (repeat until follow-up limit)
+     → Multi-turn Evaluation → Comprehensive Scoring
+   ```
+
+3. **Answer Evaluation Flow**:
+   ```
+   User Answer → Question Context → AI Evaluation →
    Detailed Scoring → Feedback Generation → Storage → Response
    ```
 
-3. **News-Based Questions Flow**:
+4. **Session Recovery Flow**:
    ```
-   Scheduled Task → RSS Fetch → News Processing → 
+   Page Load → Detect sessionId in localStorage → GET /sessions/{id}
+     → If active: GET /questions/recover → Restore messages → Resume interview
+     → If completed/missing: Clear sessionId → Show start screen
+   ```
+
+5. **News-Based Questions Flow**:
+   ```
+   Scheduled Task → RSS Fetch → News Processing →
    AI Question Generation → Database Storage → API Retrieval
    ```
 
 #### Caching and State Management Strategy
 - **Zustand** is used for all client-side state persistence, including:
   - Authentication state
-  - Interview session state
+  - Interview session ID (survives page refresh)
   - Push notification history
   - Daily question count
   - User selected position
+  - OpenAI API key (encrypted)
+  - Question count target, follow-up limit, language, model preferences
 
 ### AI Integration
 
-#### OpenAI GPT Integration
-- **Model**: GPT-4o-mini for cost efficiency
-- **Question Generation**: Context-aware prompts with position and difficulty
-- **Answer Evaluation**: Structured JSON responses with detailed metrics
-- **News Processing**: Content analysis and question relevance scoring
+#### OpenAI Responses API Integration
+- **Default Model**: `gpt-4.1-nano` (configurable per-request via frontend)
+- **API**: OpenAI Responses API (`client.responses.create` / `client.responses.stream`)
+- **Question Generation**: Context-aware prompts with position, difficulty, and language
+- **Follow-up Generation**: Conversation-history-aware prompts for multi-turn interviews
+- **Answer Evaluation**: Structured JSON output via `text` parameter with `json_schema` format
+- **News Processing**: Content analysis and question relevance scoring (uses `AsyncOpenAI`)
 
 #### Evaluation Metrics
 - **Technical Accuracy** (40%): Correctness of technical content
-- **Communication Clarity** (30%): Explanation quality and structure  
+- **Communication Clarity** (30%): Explanation quality and structure
 - **Completeness** (20%): Coverage of expected topics
 - **Practical Experience** (10%): Real-world application insights
 
@@ -202,15 +296,19 @@ MockMate is a comprehensive interview practice platform that simulates real-worl
 - Async SQLAlchemy for non-blocking operations
 - Proper indexing on frequently queried fields
 - Relationship optimization with eager loading
-
-#### Caching Strategy
-- In-memory question caching for repeated requests
-- News processing results cached for 24 hours
+- Incremental writes during streaming (sentence-boundary + time-based flushing)
 
 #### Background Processing
-- Async task execution for news processing
-- Separation of concerns between HTTP requests and scheduled tasks
-- Resource-efficient RSS parsing with request limits
+- **OpenAI streaming**: Decoupled from SSE connection via background threads
+- **DB flushing**: Independent async tasks that survive client disconnects
+- **News processing**: Async task execution with APScheduler
+- Separation of concerns between HTTP requests, background generation, and scheduled tasks
+
+#### Resilience
+- Server-side generation continues after client disconnect
+- Startup cleanup marks stale `generating` questions as `interrupted`
+- Frontend graceful fallback from streaming to non-streaming API on error
+- Session recovery from server state on page refresh
 
 ### Security Considerations
 
@@ -219,3 +317,4 @@ MockMate is a comprehensive interview practice platform that simulates real-worl
 - CORS configuration for frontend access
 - Input validation via Pydantic schemas
 - SQL injection prevention through ORM usage
+- OpenAI API key passed per-request (never stored server-side), encrypted in client localStorage

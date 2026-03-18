@@ -1,4 +1,4 @@
-# mock-mate
+# MockMate
 
 ![mock-mate icon](./mock-mate-icon.png)
 
@@ -6,16 +6,34 @@
 
 ## Introduction
 
-**MockMate** is a comprehensive **interview practice** platform that simulates real-world technical interviews. The system combines AI-powered question generation, automated answer evaluation, and trending news-based interview questions to provide an up-to-date and realistic interview experience.
+**MockMate** is an AI-powered interview practice platform that simulates real-world technical interviews. It features **streaming question generation with incremental persistence**, multi-turn follow-up conversations, structured answer evaluation, session recovery, and trending news-based interview questions — all designed for a realistic and resilient interview experience.
+
+### Key Features
+
+- **Streaming AI Questions** — Real-time SSE streaming with background persistence; generation continues server-side even if you close the tab
+- **Multi-turn Follow-ups** — AI probes deeper with follow-up questions based on your answers
+- **Structured Evaluation** — Scoring across technical accuracy, communication clarity, completeness, and practical experience
+- **Session Recovery** — Refresh or return later; your interview session and questions are restored from the server
+- **News-based Questions** — Trending tech news automatically generates relevant interview questions
+- **Configurable** — Choose position, difficulty, question type, language, OpenAI model, and follow-up depth
+
+## Tech Stack
+
+| Layer | Technologies |
+|-------|-------------|
+| Backend | Python 3.12+, FastAPI, async SQLAlchemy, SQLite, OpenAI Responses API |
+| Frontend | React 19, TypeScript, Vite, Joy UI, Zustand, react-markdown |
+| AI | OpenAI Responses API (default: `gpt-4.1-nano`, configurable per-request) |
+| Scheduling | APScheduler (news fetching every 4h, cleanup every 24h) |
 
 ## Setup
 
 ### Prerequisites
 
-- Python 3.10+ (3.12 is recommended)
-- Node.js 18+ (20+ is recommended)
+- Python 3.10+ (3.12 recommended)
+- Node.js 18+ (20+ recommended)
 - npm 10+
-- uv (if you don't have uv installed, you can install it with `pip install uv`)
+- uv (`pip install uv` if not installed)
 
 ### Backend
 
@@ -23,53 +41,41 @@
 cd backend
 cp .env.example .env
 uv venv
-source .venv/bin/activate # might be different on your system, but uv will tell you the correct command
+source .venv/bin/activate
 uv sync
 ```
 
-Note: You should change the `OPENAI_API_KEY` in the `.env` file to your own.
+Edit `.env` and set your `OPENAI_API_KEY`. Alternatively, users can enter their own API key in the frontend UI.
 
-For `NEWS_FETCH_USER_AGENT` in `.env`, you might not need to change it, but if the news fetching is not working, you can try to change it to your own browser's user agent. (Simply google "my browser user agent")
+For `NEWS_FETCH_USER_AGENT`, the default usually works. If news fetching fails, replace it with your browser's user agent.
 
 #### Run in development mode
 
 ```bash
-./run.sh # The port is 5200 by default, you can change it in the script
+./run.sh  # uvicorn dev server on :5200 with --reload
 ```
 
 #### API Documentation
 
-Visit [http://localhost:5200/docs](http://localhost:5200/docs) to view the API documentation.
+Visit [http://localhost:5200/docs](http://localhost:5200/docs) for the interactive Swagger docs.
 
 ### Frontend
 
 ```bash
-cd frontend # if you are in the root directory
+cd frontend
 cp .env.example .env
 npm i
 ```
 
-Note: You can change the values in the `.env` file to your own.
-
 #### Run in development mode
 
-The port is `1314` by default, you can change it in `vite.config.ts`
-
 ```bash
-npm run dev
+npm run dev  # Vite dev server on :1314
 ```
 
-## Production Update Script
+## Production Deployment
 
-For the Ubuntu server deployment flow, this repo provides a one-click update script: `update.sh`.
-
-It is designed for the deployment layout described in `DEPLOYMENT.md` (`/root/mockmate/app`) and will:
-- Pull latest code (`git pull`)
-- Sync backend dependencies (`uv sync`)
-- Restart backend service (`systemctl restart mockmate`)
-- Rebuild frontend assets (`npm install` and `npm run build`)
-
-Usage on server:
+For Ubuntu server deployment, see [`DEPLOYMENT.md`](./DEPLOYMENT.md). A one-click update script is provided:
 
 ```bash
 cd /root/mockmate/app
@@ -77,41 +83,33 @@ chmod +x update.sh
 ./update.sh
 ```
 
-Notes:
-- Run as a user with permission to restart systemd services (usually `root`)
-- Requires the same `conda`/`nvm` environment paths used in `DEPLOYMENT.md`
+This will pull latest code, sync backend dependencies, restart the backend service, and rebuild frontend assets.
 
 ## Database Maintenance
 
-The system automatically fetches news and generates interview questions on a schedule. Over time this data accumulates. A scheduled task runs every 24 hours to clean up expired data (default retention: 30 days). You can also run the cleanup manually:
+News data accumulates over time. A scheduled task cleans up expired data every 24h (default retention: 30 days). Manual cleanup:
 
 ```bash
 cd backend
 
-# Preview what would be deleted (no changes made)
+# Preview (no changes)
 python cleanup_news.py --dry-run
 
 # Clean up with default 30-day retention
 python cleanup_news.py
 
-# Custom retention period
+# Custom retention
 python cleanup_news.py --days 7
 ```
 
-To change the default retention period, set the `NEWS_RETENTION_DAYS` environment variable in your `.env` file:
+Set `NEWS_RETENTION_DAYS` in `.env` to change the default. The cleanup deletes expired news questions (skipping those used in sessions), expired news items, and runs SQLite `VACUUM`.
 
-```env
-NEWS_RETENTION_DAYS=14
-```
+## Architecture
 
-The cleanup process:
-1. Deletes expired `NewsBasedQuestion` and associated `Question` records
-2. Skips questions that have been used in user interview sessions
-3. Deletes expired `NewsItem` records
-4. Runs SQLite `VACUUM` to reclaim disk space
+See [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) for the full system design, including:
+- Streaming generation architecture (background thread + async flush task + SSE)
+- Session recovery flow
+- Follow-up conversation system
+- News processing pipeline
 
-## System Architecture (Task Design Document)
-
-See [MockMate - Interview Simulation System Architecture](https://github.com/CUinspace233/mock-mate/wiki/Mock-Mate-%E2%80%90-Interview-Simulation-System-Architecture)
-
-For more fancy documentation, please visit this repo's [DeepWiki](https://deepwiki.com/CUinspace233/mock-mate) !
+For interactive documentation, visit this repo's [DeepWiki](https://deepwiki.com/CUinspace233/mock-mate).

@@ -1,17 +1,20 @@
-export const PositionLabels = {
-  frontend: "Frontend Engineer",
-  backend: "Backend Engineer",
-  fullstack: "Fullstack Engineer",
-  mobile: "Mobile Developer",
-  devops: "DevOps Engineer",
-  ai: "AI Engineer",
-  qa: "QA Engineer",
-  product: "Product Manager",
-  ui: "UI/UX Designer",
-  data: "Data Analyst",
-} as const;
+import interviewPositionsConfig from "../../../shared/interview_positions.json" with {
+  type: "json",
+};
 
-export type PositionKey = keyof typeof PositionLabels;
+/** Preset job roles (shared with backend news/trending generation). */
+export const PRESET_POSITION_IDS = interviewPositionsConfig.positions.map((p) => p.id);
+
+export const PositionLabels = Object.fromEntries(
+  interviewPositionsConfig.positions.map((p) => [p.id, p.label]),
+) as Record<string, string>;
+
+export type PositionKey = (typeof interviewPositionsConfig.positions)[number]["id"];
+
+export const JOB_POSITION_OPTIONS: { value: string; label: string }[] = [
+  ...interviewPositionsConfig.positions.map((p) => ({ value: p.id, label: p.label })),
+  { value: "__custom__", label: "Custom..." },
+];
 
 export enum Difficulty {
   EASY = "easy",

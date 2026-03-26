@@ -1,0 +1,14 @@
+{
+  "positions": [
+    { "id": "frontend", "label": "Frontend Engineer" },
+    { "id": "backend", "label": "Backend Engineer" },
+    { "id": "fullstack", "label": "Fullstack Engineer" },
+    { "id": "mobile", "label": "Mobile Developer" },
+    { "id": "devops", "label": "DevOps Engineer" },
+    { "id": "ai", "label": "AI Engineer" },
+    { "id": "qa", "label": "QA Engineer" },
+    { "id": "product", "label": "Product Manager" },
+    { "id": "ui", "label": "UI/UX Designer" },
+    { "id": "data", "label": "Data Analyst" }
+  ]
+}

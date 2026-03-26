@@ -43,7 +43,7 @@ import {
   recoverQuestions,
 } from "../api/api";
 import type { Message } from "../types/interview.ts";
-import { Difficulty, QuestionType } from "../types/interview";
+import { Difficulty, QuestionType, JOB_POSITION_OPTIONS } from "../types/interview";
 import { getDifficultyColor } from "../utils";
 import NewsQuestionPush from "./NewsQuestionPush.tsx";
 import type { NewsQuestion } from "../types/interview.ts";
@@ -55,21 +55,6 @@ interface InterviewTrainingProps {
   username: string;
   onLogout: () => void;
 }
-
-// Job positions data
-const jobPositions = [
-  { value: "frontend", label: "Frontend Engineer" },
-  { value: "backend", label: "Backend Engineer" },
-  { value: "fullstack", label: "Fullstack Engineer" },
-  { value: "mobile", label: "Mobile Developer" },
-  { value: "devops", label: "DevOps Engineer" },
-  { value: "ai", label: "AI Engineer" },
-  { value: "qa", label: "QA Engineer" },
-  { value: "product", label: "Product Manager" },
-  { value: "ui", label: "UI/UX Designer" },
-  { value: "data", label: "Data Analyst" },
-  { value: "__custom__", label: "Custom..." },
-];
 
 export default function InterviewTraining({ username, onLogout }: InterviewTrainingProps) {
   // zustand hooks
@@ -485,7 +470,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
                   handlePositionChange(value);
                 }
               }} size="sm" sx={{ minWidth: { xs: 110, md: 140 } }}>
-                {jobPositions.filter(p => p.value !== "__custom__").map((position) => (
+                {JOB_POSITION_OPTIONS.filter((p) => p.value !== "__custom__").map((position) => (
                   <Option key={position.value} value={position.value}>{position.label}</Option>
                 ))}
                 <Divider sx={{ my: 0.5 }} />

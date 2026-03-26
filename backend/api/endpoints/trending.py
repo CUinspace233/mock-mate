@@ -1,7 +1,9 @@
 import asyncio
+import json
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Sequence
 
 import feedparser  # type: ignore
@@ -29,6 +31,20 @@ from utility.settings import settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+_INTERVIEW_POSITIONS_PATH = (
+    Path(__file__).resolve().parents[3] / "shared" / "interview_positions.json"
+)
+
+
+def _load_preset_position_ids() -> tuple[str, ...]:
+    with _INTERVIEW_POSITIONS_PATH.open(encoding="utf-8") as f:
+        data = json.load(f)
+    return tuple(str(p["id"]) for p in data["positions"])
+
+
+# Must match shared/interview_positions.json (frontend preset list, excluding __custom__)
+DEFAULT_POSITIONS: tuple[str, ...] = _load_preset_position_ids()
 
 NEWS_SOURCES = {
     NewsCategory.AI: [
@@ -65,9 +81,6 @@ NEWS_SOURCES = {
         }
     ],
 }
-
-
-DEFAULT_POSITIONS = ["frontend", "backend", "fullstack", "mobile", "devops"]
 
 
 @dataclass
@@ -306,6 +319,20 @@ def calculate_relevance_score(
         "fullstack": ["full stack", "frontend", "backend", "web development"],
         "mobile": ["mobile", "ios", "android", "react native", "flutter", "app"],
         "devops": ["docker", "kubernetes", "aws", "cloud", "deployment", "ci/cd"],
+        "ai": [
+            "ai",
+            "machine learning",
+            "llm",
+            "openai",
+            "model",
+            "neural",
+            "deep learning",
+            "gpt",
+        ],
+        "qa": ["test", "testing", "quality", "automation", "selenium", "cypress", "bug"],
+        "product": ["product", "roadmap", "stakeholder", "feature", "release", "user"],
+        "ui": ["design", "figma", "ux", "ui", "prototype", "accessibility"],
+        "data": ["data", "analytics", "sql", "warehouse", "etl", "bi", "dashboard"],
     }
 
     keywords = position_keywords.get(position, [])

@@ -6,5 +6,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 1314,
+    fs: {
+      // Repo root (for shared/interview_positions.json imports from src)
+      allow: [".."],
+    },
   },
 });

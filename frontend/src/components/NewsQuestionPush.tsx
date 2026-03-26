@@ -32,34 +32,37 @@ export default function NewsQuestionPush({
   const pushServiceRef = useRef<NewsQuestionPushService | null>(null);
 
   useEffect(() => {
-    // Initialize push service
-    if (userId && !pushServiceRef.current) {
-      pushServiceRef.current = new NewsQuestionPushService(userId);
+    setIsServiceStarted(false);
+  }, [userId]);
 
-      pushServiceRef.current.setCallbacks(
-        // onPush callback
-        (question: NewsQuestion) => {
-          setCurrentQuestion(question);
-          setShowPushModal(true);
-        },
-        // onReminder callback
-        (question: NewsQuestion) => {
-          setCurrentQuestion(question);
-          setShowPushModal(true);
-        },
-      );
+  useEffect(() => {
+    if (!userId) {
+      pushServiceRef.current?.stopPushService();
+      pushServiceRef.current = null;
+      return;
     }
 
+    pushServiceRef.current?.stopPushService();
+    pushServiceRef.current = new NewsQuestionPushService(userId);
+    pushServiceRef.current.setCallbacks(
+      (question: NewsQuestion) => {
+        setCurrentQuestion(question);
+        setShowPushModal(true);
+      },
+      (question: NewsQuestion) => {
+        setCurrentQuestion(question);
+        setShowPushModal(true);
+      },
+    );
+
     return () => {
-      // Cleanup on unmount
-      if (pushServiceRef.current) {
-        pushServiceRef.current.stopPushService();
-      }
+      pushServiceRef.current?.stopPushService();
+      pushServiceRef.current = null;
     };
   }, [userId]);
 
   useEffect(() => {
-    // Start/stop service based on interview status
+    // Start push (and browser notification permission) once the service exists and user is not in an interview
     if (pushServiceRef.current && !isInterviewActive && !isServiceStarted) {
       pushServiceRef.current
         .startPushService()
@@ -71,7 +74,7 @@ export default function NewsQuestionPush({
           setError("Failed to start push service: " + err.message);
         });
     }
-  }, [isInterviewActive, isServiceStarted]);
+  }, [userId, isInterviewActive, isServiceStarted]);
 
   const handleStartAnswer = (questionId: string) => {
     if (pushServiceRef.current) {

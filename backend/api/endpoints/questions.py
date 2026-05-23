@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.deps import get_db
 from database import models
 from database.schemas import (
+    CreativityLevel,
     GeneratedQuestion,
     GenerateFollowUpRequest,
     GenerateQuestionRequest,
@@ -25,6 +26,8 @@ from database.schemas import (
     QuestionStatus,
     QuestionType,
     RecoverableQuestionResponse,
+    ResumeDrillFollowUpRequest,
+    ResumeDrillQuestionRequest,
     TopicCount,
 )
 from database.session import AsyncSessionLocal
@@ -38,6 +41,49 @@ LANGUAGE_NAMES = {
     "ja": "Japanese",
     "ko": "Korean",
 }
+
+CREATIVITY_SAMPLING = {
+    CreativityLevel.FOCUSED: (0.3, 0.75),
+    CreativityLevel.BALANCED: (0.75, 0.95),
+    CreativityLevel.CREATIVE: (1.1, 1.0),
+}
+
+
+def _sampling_for(creativity: CreativityLevel) -> tuple[float, float]:
+    return CREATIVITY_SAMPLING.get(creativity, CREATIVITY_SAMPLING[CreativityLevel.BALANCED])
+
+
+def _single_interview_question(text: str) -> str:
+    """Trim model output to one natural interview question."""
+    cleaned = text.strip()
+    if not cleaned:
+        return cleaned
+
+    lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
+    if lines:
+        first_list_item = next(
+            (
+                line
+                for line in lines
+                if line[:2].lower() in {"1.", "- ", "* "} or line.startswith(("①", "1、"))
+            ),
+            None,
+        )
+        if first_list_item:
+            cleaned = first_list_item
+
+    prefixes = ("1.", "1、", "-", "*", "①")
+    for prefix in prefixes:
+        if cleaned.startswith(prefix):
+            cleaned = cleaned[len(prefix) :].strip()
+
+    question_marks = [mark for mark in ("?", "？") if mark in cleaned]
+    if question_marks:
+        first_positions = [cleaned.find(mark) for mark in question_marks if cleaned.find(mark) >= 0]
+        cutoff = min(first_positions)
+        cleaned = cleaned[: cutoff + 1].strip()
+
+    return cleaned
 
 
 def _lang_prompt(lang: str) -> str:
@@ -111,6 +157,7 @@ def _run_openai_stream_in_thread(
     prompt: str,
     max_output_tokens: int,
     temperature: float,
+    top_p: float | None,
     state: _GenerationState,
 ):
     """Run the synchronous OpenAI streaming call in a background thread.
@@ -120,19 +167,35 @@ def _run_openai_stream_in_thread(
     """
     content = ""
     try:
+        create_kwargs = {
+            "model": model,
+            "instructions": instructions,
+            "input": prompt,
+            "max_output_tokens": max_output_tokens,
+            "temperature": temperature,
+        }
+        if top_p is not None:
+            create_kwargs["top_p"] = top_p
+
         with client.responses.stream(
-            model=model,
-            instructions=instructions,
-            input=prompt,
-            max_output_tokens=max_output_tokens,
-            temperature=temperature,
+            **create_kwargs,
         ) as stream:
             for event in stream:
                 if event.type == "response.output_text.delta" and event.delta:
                     content += event.delta
                     state.add_delta(event.delta)
-            final_response = stream.get_final_response()
-        state.mark_done(content, final_response.id)
+            try:
+                final_response = stream.get_final_response()
+                response_id = final_response.id
+            except Exception as final_error:
+                if not content.strip():
+                    raise
+                logger.warning(
+                    "OpenAI stream ended without final response event; using streamed content. Error: %s",
+                    final_error,
+                )
+                response_id = ""
+        state.mark_done(_single_interview_question(content), response_id)
     except Exception as e:
         logger.exception("OpenAI stream error")
         state.mark_error(str(e), content)
@@ -220,7 +283,8 @@ async def generate_ai_question(
     question_type: QuestionType | None = QuestionType.TECHNICAL,
     openai_api_key: str = "",
     language: str = "en",
-    openai_model: str = "gpt-4.1-nano",
+    openai_model: str = "gpt-5.4-mini",
+    creativity: CreativityLevel = CreativityLevel.BALANCED,
 ) -> GeneratedQuestion:
     """Generate a question using AI (OpenAI GPT)"""
     client = _get_client(openai_api_key)
@@ -231,13 +295,20 @@ async def generate_ai_question(
         "or 'Describe your experience with...'. Return only the question." + _lang_prompt(language)
     )
 
-    response = client.responses.create(
-        model=openai_model,
-        instructions=("You are an expert interview question generator." + _lang_system(language)),
-        input=prompt,
-        max_output_tokens=100,
-        temperature=0.9,
-    )
+    temperature, top_p = _sampling_for(creativity)
+    create_kwargs = {
+        "model": openai_model,
+        "instructions": (
+            "You are an expert interview question generator." + _lang_system(language)
+        ),
+        "input": prompt,
+        "max_output_tokens": 100,
+        "temperature": temperature,
+    }
+    if top_p is not None:
+        create_kwargs["top_p"] = top_p
+
+    response = client.responses.create(**create_kwargs)
 
     question_content = (response.output_text or "").strip()
 
@@ -308,7 +379,15 @@ async def generate_question_stream(
     # Start OpenAI stream in background thread
     thread = threading.Thread(
         target=_run_openai_stream_in_thread,
-        args=(client, req.openai_model, instructions, prompt, 100, 0.9, state),
+        args=(
+            client,
+            req.openai_model,
+            instructions,
+            prompt,
+            100,
+            *_sampling_for(req.creativity),
+            state,
+        ),
         daemon=True,
     )
     thread.start()
@@ -405,7 +484,15 @@ async def generate_followup_stream(
 
     thread = threading.Thread(
         target=_run_openai_stream_in_thread,
-        args=(client, req.openai_model, instructions, prompt, 150, 0.7, state),
+        args=(
+            client,
+            req.openai_model,
+            instructions,
+            prompt,
+            150,
+            *_sampling_for(req.creativity),
+            state,
+        ),
         daemon=True,
     )
     thread.start()
@@ -451,6 +538,236 @@ async def generate_followup_stream(
     return StreamingResponse(sse_iter(), media_type="text/event-stream")
 
 
+@router.post("/generate/resume/stream")
+async def generate_resume_question_stream(
+    req: ResumeDrillQuestionRequest, db: AsyncSession = Depends(get_db)
+):
+    """Generate a resume-project drilling question, streamed via SSE."""
+    resume = await db.scalar(
+        select(models.Resume).where(
+            models.Resume.id == req.resume_id,
+            models.Resume.user_id == req.user_id,
+        )
+    )
+    if not resume:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found")
+
+    client = _get_client(req.openai_api_key)
+    project = req.project.model_dump()
+    keywords = list(dict.fromkeys(req.project.tech_stack + req.project.evidence[:4]))
+    if not keywords:
+        keywords = ["resume", "project", "evidence"]
+
+    prompt = (
+        f"Position: {req.position}, Difficulty: {req.difficulty}\n"
+        f"Resume filename: {resume.filename}\n"
+        f"Project to drill: {json.dumps(project, ensure_ascii=False)}\n"
+        f"Resume context excerpt:\n{resume.content_text[:6000]}\n\n"
+        f"This is point {req.point_number} of {req.point_count} for this project, "
+        f"question {req.question_number} of {req.questions_per_project} overall.\n"
+        "Generate exactly one natural interview question. It should sound like a real interviewer "
+        "speaking in one turn, not a written checklist. Pick one concrete angle only: implementation "
+        "details, a technical tradeoff, ownership, metrics, a failure mode, or evidence behind one "
+        "resume claim. Do not include multiple subquestions, numbered lists, bullets, or 'please explain "
+        "A, B, C, and D' wording. Return only that one question." + _lang_prompt(req.language)
+    )
+    instructions = (
+        "You are a demanding but constructive technical interviewer. Drill into resume project claims "
+        "with specific, evidence-seeking questions. Ask one short, conversational question at a time. "
+        "Avoid insults, lists, and generic prompts." + _lang_system(req.language)
+    )
+
+    question_id = str(uuid.uuid4())
+    question = models.Question(
+        id=question_id,
+        content="",
+        position=req.position,
+        difficulty=req.difficulty or "medium",
+        question_type=QuestionType.TECHNICAL,
+        expected_keywords=keywords,
+        status=QuestionStatus.GENERATING,
+        session_id=req.session_id,
+    )
+    db.add(question)
+    await db.commit()
+    created_at = question.created_at or datetime.now(UTC)
+
+    state = _GenerationState()
+    thread = threading.Thread(
+        target=_run_openai_stream_in_thread,
+        args=(
+            client,
+            req.openai_model,
+            instructions,
+            prompt,
+            500,
+            *_sampling_for(req.creativity),
+            state,
+        ),
+        daemon=True,
+    )
+    thread.start()
+    asyncio.create_task(_bg_flush_task(question_id, state))
+
+    async def sse_iter():
+        yield f"event: init\ndata: {json.dumps({'question_id': question_id})}\n\n"
+        cursor = 0
+        while True:
+            new_deltas, cursor = state.get_new_deltas(cursor)
+            for delta in new_deltas:
+                yield f"event: content\ndata: {json.dumps({'delta': delta})}\n\n"
+
+            content, done, error, response_id = state.snapshot()
+            if done:
+                new_deltas, cursor = state.get_new_deltas(cursor)
+                for delta in new_deltas:
+                    yield f"event: content\ndata: {json.dumps({'delta': delta})}\n\n"
+
+                if error:
+                    yield f"event: error\ndata: {json.dumps({'error': error})}\n\n"
+                else:
+                    final = {
+                        "question_id": question_id,
+                        "content": content.strip(),
+                        "position": req.position,
+                        "difficulty": req.difficulty or "medium",
+                        "question_type": QuestionType.TECHNICAL,
+                        "expected_keywords": keywords,
+                        "created_at": created_at.isoformat(),
+                        "response_id": response_id,
+                    }
+                    yield f"event: final\ndata: {json.dumps(final)}\n\n"
+                yield "event: end\ndata: {}\n\n"
+                break
+
+            await asyncio.sleep(0.05)
+
+    return StreamingResponse(sse_iter(), media_type="text/event-stream")
+
+
+@router.post("/generate/resume/followup/stream")
+async def generate_resume_followup_stream(
+    req: ResumeDrillFollowUpRequest, db: AsyncSession = Depends(get_db)
+):
+    """Generate a resume-project follow-up question, streamed via SSE."""
+    resume = await db.scalar(
+        select(models.Resume).where(
+            models.Resume.id == req.resume_id,
+            models.Resume.user_id == req.user_id,
+        )
+    )
+    if not resume:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found")
+
+    client = _get_client(req.openai_api_key)
+    project = req.project.model_dump()
+    conversation_text = ""
+    for entry in req.conversation_history:
+        label = "Interviewer" if entry.role == "interviewer" else "Candidate"
+        conversation_text += f"{label}: {entry.content}\n\n"
+
+    keywords = list(dict.fromkeys(req.project.tech_stack + ["depth", "ownership", "tradeoffs"]))
+    should_shift_topic = req.force_new_topic or req.topic_depth > req.followups_per_point
+    topic_strategy = (
+        "Shift to a different important aspect of this project that has not been the focus of the "
+        "current local thread. Start a new point from the same project instead of continuing the same "
+        "metric, threshold, validation, implementation-detail, or ownership line unless the project has "
+        "no other meaningful claims."
+        if should_shift_topic
+        else "Stay close to the candidate's last answer for this one follow-up, but do not ask more than "
+        "one concrete detail."
+    )
+    prompt = (
+        f"Position: {req.position}, Difficulty: {req.difficulty}\n"
+        f"Project being drilled: {json.dumps(project, ensure_ascii=False)}\n"
+        f"Original question: {req.original_question}\n\n"
+        f"Conversation so far:\n{conversation_text}\n"
+        f"This is point {req.point_number} of {req.point_count} for this project, "
+        f"question {req.question_number} of {req.questions_per_project} overall.\n"
+        f"Each point allows {req.followups_per_point} follow-up rounds before shifting.\n"
+        f"Topic strategy: {topic_strategy}\n"
+        "Generate exactly one natural follow-up question. Ask about one concrete thing only: a mechanism, "
+        "number, decision, debugging detail, architecture tradeoff, or personal ownership. If the topic "
+        "strategy says to shift, choose a new angle from the same project instead of continuing the same "
+        "line of questioning. Do not include multiple subquestions, numbered lists, bullets, or broad "
+        "checklist phrasing. Return only that one question." + _lang_prompt(req.language)
+    )
+    instructions = (
+        "You are a demanding but constructive interviewer conducting a resume project drill. "
+        "A good rhythm is one main question, one or two follow-ups on that local topic, then a new angle "
+        "within the same project. Ask one short, conversational question at a time."
+        + _lang_system(req.language)
+    )
+
+    question_id = str(uuid.uuid4())
+    question = models.Question(
+        id=question_id,
+        content="",
+        position=req.position,
+        difficulty=req.difficulty or "medium",
+        question_type=QuestionType.TECHNICAL,
+        expected_keywords=keywords,
+        status=QuestionStatus.GENERATING,
+        session_id=req.session_id,
+    )
+    db.add(question)
+    await db.commit()
+    created_at = question.created_at or datetime.now(UTC)
+
+    state = _GenerationState()
+    thread = threading.Thread(
+        target=_run_openai_stream_in_thread,
+        args=(
+            client,
+            req.openai_model,
+            instructions,
+            prompt,
+            650,
+            *_sampling_for(req.creativity),
+            state,
+        ),
+        daemon=True,
+    )
+    thread.start()
+    asyncio.create_task(_bg_flush_task(question_id, state))
+
+    async def sse_iter():
+        yield f"event: init\ndata: {json.dumps({'question_id': question_id})}\n\n"
+        cursor = 0
+        while True:
+            new_deltas, cursor = state.get_new_deltas(cursor)
+            for delta in new_deltas:
+                yield f"event: content\ndata: {json.dumps({'delta': delta})}\n\n"
+
+            content, done, error, response_id = state.snapshot()
+            if done:
+                new_deltas, cursor = state.get_new_deltas(cursor)
+                for delta in new_deltas:
+                    yield f"event: content\ndata: {json.dumps({'delta': delta})}\n\n"
+
+                if error:
+                    yield f"event: error\ndata: {json.dumps({'error': error})}\n\n"
+                else:
+                    final = {
+                        "question_id": question_id,
+                        "content": content.strip(),
+                        "position": req.position,
+                        "difficulty": req.difficulty or "medium",
+                        "question_type": QuestionType.TECHNICAL,
+                        "expected_keywords": keywords,
+                        "created_at": created_at.isoformat(),
+                        "response_id": response_id,
+                        "is_follow_up": True,
+                    }
+                    yield f"event: final\ndata: {json.dumps(final)}\n\n"
+                yield "event: end\ndata: {}\n\n"
+                break
+
+            await asyncio.sleep(0.05)
+
+    return StreamingResponse(sse_iter(), media_type="text/event-stream")
+
+
 # ---------------------------------------------------------------------------
 # Non-streaming generation
 # ---------------------------------------------------------------------------
@@ -469,6 +786,7 @@ async def generate_question(
             request.openai_api_key,
             request.language,
             request.openai_model,
+            request.creativity,
         )
 
         question = models.Question(

@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text, update
 
-from api.endpoints import answers, questions, sessions, trending, user
+from api.endpoints import answers, questions, resume, sessions, trending, user
 from database.models import Base, Question
 from database.session import AsyncSessionLocal, engine
 from scheduler import start_scheduler
@@ -66,6 +66,7 @@ app.include_router(questions.router, prefix="/api/questions", tags=["Questions"]
 app.include_router(answers.router, prefix="/api/answers", tags=["Answers"])
 app.include_router(sessions.router, prefix="/api/sessions", tags=["Sessions"])
 app.include_router(trending.router, prefix="/api/trending", tags=["Trending Questions"])
+app.include_router(resume.router, prefix="/api/resume", tags=["Resume"])
 
 
 @app.get("/")

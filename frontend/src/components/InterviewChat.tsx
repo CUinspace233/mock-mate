@@ -42,6 +42,7 @@ import {
   type EvaluateAnswerResponse,
   type GenerateQuestionRequest,
   type ConversationEntry,
+  CreativityLevel,
   Difficulty,
   type Message,
   type NewsQuestion,
@@ -75,6 +76,7 @@ interface InterviewChatProps {
   followUpLimit: number;
   language: string;
   openaiModel: string;
+  questionCreativity: CreativityLevel;
 }
 
 export default function InterviewChat({
@@ -102,6 +104,7 @@ export default function InterviewChat({
   followUpLimit,
   language,
   openaiModel,
+  questionCreativity,
 }: InterviewChatProps) {
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -163,6 +166,7 @@ export default function InterviewChat({
         user_id: user_id,
         openai_api_key: openaiApiKey,
         openai_model: openaiModel,
+        creativity: questionCreativity,
         is_last_question: currentQuestionNumber + 1 >= questionCountTarget,
         language,
         session_id: sessionIdRef.current || undefined,
@@ -249,6 +253,7 @@ export default function InterviewChat({
           user_id: user_id,
           openai_api_key: openaiApiKey,
           openai_model: openaiModel,
+          creativity: questionCreativity,
           is_last_question: currentQuestionNumber + 1 >= questionCountTarget,
           language,
           session_id: sessionIdRef.current || undefined,
@@ -330,6 +335,7 @@ export default function InterviewChat({
     questionType,
     openaiApiKey,
     openaiModel,
+    questionCreativity,
     onQuestionNumberIncrement,
     followUpLimit,
     currentQuestionNumber,
@@ -375,7 +381,14 @@ export default function InterviewChat({
         onPresetQuestionUsed();
       }
     },
-    [setMessages, setCurrentQuestion, setAwaitingAnswer, onQuestionNumberIncrement, onPresetQuestionUsed, followUpLimit],
+    [
+      setMessages,
+      setCurrentQuestion,
+      setAwaitingAnswer,
+      onQuestionNumberIncrement,
+      onPresetQuestionUsed,
+      followUpLimit,
+    ],
   );
 
   const hasInitialized = useRef(false);
@@ -398,7 +411,14 @@ export default function InterviewChat({
         generateQuestion();
       }
     }
-  }, [interviewStarted, isRecoveredSession, messages.length, presetQuestion, processPresetQuestion, generateQuestion]);
+  }, [
+    interviewStarted,
+    isRecoveredSession,
+    messages.length,
+    presetQuestion,
+    processPresetQuestion,
+    generateQuestion,
+  ]);
 
   const resetFollowUpState = () => {
     setFollowUpCount(0);
@@ -457,12 +477,13 @@ export default function InterviewChat({
     setMessages((prev) => [...prev, evaluationMessage]);
 
     // Concatenate all candidate answers for the record
-    const allAnswers = isInFollowUpMode && history.length > 2
-      ? history
-          .filter((e) => e.role === "candidate")
-          .map((e) => e.content)
-          .join("\n---\n")
-      : answer;
+    const allAnswers =
+      isInFollowUpMode && history.length > 2
+        ? history
+            .filter((e) => e.role === "candidate")
+            .map((e) => e.content)
+            .join("\n---\n")
+        : answer;
 
     saveInterviewRecord(user_id, {
       id: null,
@@ -513,6 +534,7 @@ export default function InterviewChat({
         user_id: user_id,
         openai_api_key: openaiApiKey,
         openai_model: openaiModel,
+        creativity: questionCreativity,
         language,
         session_id: sessionIdRef.current || undefined,
       },
@@ -581,12 +603,7 @@ export default function InterviewChat({
     try {
       // If follow-ups are disabled, use original single-turn behavior
       if (followUpLimit === 0 || !isInFollowUpMode) {
-        await handleEvaluateAndSave(
-          currentQuestion.id,
-          currentQuestion.content,
-          answerText,
-          [],
-        );
+        await handleEvaluateAndSave(currentQuestion.id, currentQuestion.content, answerText, []);
         return;
       }
 
@@ -694,7 +711,12 @@ export default function InterviewChat({
             mb: 3,
           }}
         >
-          <Box component="img" src="/robot_icon.png" alt="AI" sx={{ width: { xs: 32, sm: 44 }, height: { xs: 32, sm: 44 } }} />
+          <Box
+            component="img"
+            src="/robot_icon.png"
+            alt="AI"
+            sx={{ width: { xs: 32, sm: 44 }, height: { xs: 32, sm: 44 } }}
+          />
         </Box>
         <Typography
           level="h3"
@@ -708,9 +730,12 @@ export default function InterviewChat({
         >
           Ready When You Are
         </Typography>
-        <Typography level="body-md" sx={{ color: "neutral.500", mb: 1, maxWidth: 560, mx: "auto", lineHeight: 1.7 }}>
-          Configure your position, difficulty, and question type above,
-          then start a mock interview session with AI-powered questions.
+        <Typography
+          level="body-md"
+          sx={{ color: "neutral.500", mb: 1, maxWidth: 560, mx: "auto", lineHeight: 1.7 }}
+        >
+          Configure your position, difficulty, and question type above, then start a mock interview
+          session with AI-powered questions.
         </Typography>
         <Typography level="body-sm" sx={{ color: "neutral.400", mb: 4 }}>
           Real-time feedback and scoring after each answer
@@ -751,10 +776,18 @@ export default function InterviewChat({
   }
 
   return (
-    <Box sx={{ height: { xs: "calc(100vh - 220px)", sm: "600px" }, display: "flex", flexDirection: "column" }}>
+    <Box
+      sx={{
+        height: { xs: "calc(100vh - 220px)", sm: "600px" },
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       {/* Question Progress */}
       {currentQuestionNumber > 0 && (
-        <Box sx={{ px: 2, pt: 1.5, display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+        <Box
+          sx={{ px: 2, pt: 1.5, display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}
+        >
           <Chip
             size="sm"
             variant="soft"
@@ -806,7 +839,12 @@ export default function InterviewChat({
           >
             {message.sender === "ai" && (
               <Avatar size="sm" sx={{ bgcolor: "primary.100", color: "primary.600" }}>
-                <Box component="img" src="/robot_icon.png" alt="AI" sx={{ width: 24, height: 24 }} />
+                <Box
+                  component="img"
+                  src="/robot_icon.png"
+                  alt="AI"
+                  sx={{ width: 24, height: 24 }}
+                />
               </Avatar>
             )}
 
@@ -846,36 +884,36 @@ export default function InterviewChat({
                     ))}
                   </Stack>
                 ) : (
-                <Typography
-                  level="body-md"
-                  component="div"
-                  sx={{
-                    color: message.sender === "user" ? "primary.800" : "text.primary",
-                    "& p": { m: 0 },
-                    "& p + p": { mt: 1 },
-                    "& code": {
-                      bgcolor: "neutral.100",
-                      px: 0.5,
-                      py: 0.25,
-                      borderRadius: "4px",
-                      fontSize: "0.85em",
-                      fontFamily: "monospace",
-                    },
-                    "& pre": {
-                      bgcolor: "neutral.100",
-                      p: 1.5,
-                      borderRadius: "8px",
-                      overflow: "auto",
-                      my: 1,
-                    },
-                    "& pre code": {
-                      bgcolor: "transparent",
-                      p: 0,
-                    },
-                  }}
-                >
-                  <Markdown>{message.content}</Markdown>
-                </Typography>
+                  <Typography
+                    level="body-md"
+                    component="div"
+                    sx={{
+                      color: message.sender === "user" ? "primary.800" : "text.primary",
+                      "& p": { m: 0 },
+                      "& p + p": { mt: 1 },
+                      "& code": {
+                        bgcolor: "neutral.100",
+                        px: 0.5,
+                        py: 0.25,
+                        borderRadius: "4px",
+                        fontSize: "0.85em",
+                        fontFamily: "monospace",
+                      },
+                      "& pre": {
+                        bgcolor: "neutral.100",
+                        p: 1.5,
+                        borderRadius: "8px",
+                        overflow: "auto",
+                        my: 1,
+                      },
+                      "& pre code": {
+                        bgcolor: "transparent",
+                        p: 0,
+                      },
+                    }}
+                  >
+                    <Markdown>{message.content}</Markdown>
+                  </Typography>
                 )}
                 {message.score && (
                   <Box sx={{ mt: 1 }}>
@@ -905,7 +943,12 @@ export default function InterviewChat({
         ))}
 
         {isLoading && !messages.some((m) => m.id.startsWith("temp-")) && (
-          <Stack direction="row" spacing={2} alignItems="center" sx={{ animation: "fadeIn 0.3s ease-out" }}>
+          <Stack
+            direction="row"
+            spacing={2}
+            alignItems="center"
+            sx={{ animation: "fadeIn 0.3s ease-out" }}
+          >
             <Avatar size="sm" sx={{ bgcolor: "primary.100", color: "primary.600" }}>
               <Box component="img" src="/robot_icon.png" alt="AI" sx={{ width: 24, height: 24 }} />
             </Avatar>
@@ -965,7 +1008,10 @@ export default function InterviewChat({
               }}
             />
             <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
-              <Typography level="body-xs" sx={{ color: "neutral.400", display: { xs: "none", sm: "block" } }}>
+              <Typography
+                level="body-xs"
+                sx={{ color: "neutral.400", display: { xs: "none", sm: "block" } }}
+              >
                 Ctrl/Cmd+Enter to send{isSupported ? " · click mic to speak" : ""}
               </Typography>
               <Stack direction="row" spacing={1}>
@@ -977,13 +1023,17 @@ export default function InterviewChat({
                       size="sm"
                       onClick={toggleRecording}
                       disabled={isLoading}
-                      sx={isRecording ? {
-                        animation: "pulse 1.5s ease-in-out infinite",
-                        "@keyframes pulse": {
-                          "0%, 100%": { opacity: 1 },
-                          "50%": { opacity: 0.6 },
-                        },
-                      } : undefined}
+                      sx={
+                        isRecording
+                          ? {
+                              animation: "pulse 1.5s ease-in-out infinite",
+                              "@keyframes pulse": {
+                                "0%, 100%": { opacity: 1 },
+                                "50%": { opacity: 0.6 },
+                              },
+                            }
+                          : undefined
+                      }
                     >
                       {isRecording ? <StopIcon /> : <MicIcon />}
                     </IconButton>

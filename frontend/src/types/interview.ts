@@ -1,6 +1,4 @@
-import interviewPositionsConfig from "../../../shared/interview_positions.json" with {
-  type: "json",
-};
+import interviewPositionsConfig from "../../../shared/interview_positions.json" with { type: "json" };
 
 /** Preset job roles (shared with backend news/trending generation). */
 export const PRESET_POSITION_IDS = interviewPositionsConfig.positions.map((p) => p.id);
@@ -25,12 +23,19 @@ export enum Difficulty {
 export enum SessionType {
   PRACTICE = "practice",
   MOCK_INTERVIEW = "mock_interview",
+  RESUME_DRILL = "resume_drill",
 }
 
 export enum QuestionType {
   OPINION = "opinion",
   TECHNICAL = "technical",
   BEHAVIORAL = "behavioral",
+}
+
+export enum CreativityLevel {
+  FOCUSED = "focused",
+  BALANCED = "balanced",
+  CREATIVE = "creative",
 }
 
 export interface Message {
@@ -57,6 +62,7 @@ export interface GenerateQuestionRequest {
   is_last_question?: boolean;
   language?: string;
   session_id?: string;
+  creativity?: CreativityLevel;
 }
 
 export interface GenerateQuestionResponse {
@@ -97,11 +103,62 @@ export interface FollowUpRequest {
   openai_model?: string;
   language?: string;
   session_id?: string;
+  creativity?: CreativityLevel;
 }
 
 export interface FollowUpStreamResponse extends GenerateQuestionResponse {
   is_follow_up: boolean;
   follow_up_number: number;
+}
+
+export interface ResumeProject {
+  project_id: string;
+  name: string;
+  role: string;
+  tech_stack: string[];
+  summary: string;
+  evidence: string[];
+}
+
+export interface ResumeResource {
+  id: string;
+  user_id: number;
+  filename: string;
+  content_text: string;
+  projects: ResumeProject[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UploadResumeResponse {
+  resume: ResumeResource;
+  message: string;
+}
+
+export interface ResumeDrillQuestionRequest {
+  resume_id: string;
+  project: ResumeProject;
+  resume_summary?: string;
+  question_number: number;
+  questions_per_project: number;
+  point_count?: number;
+  followups_per_point?: number;
+  point_number?: number;
+  position: string;
+  difficulty: Difficulty | null;
+  user_id: number;
+  openai_api_key: string;
+  openai_model?: string;
+  language?: string;
+  session_id?: string;
+  creativity?: CreativityLevel;
+}
+
+export interface ResumeDrillFollowUpRequest extends ResumeDrillQuestionRequest {
+  original_question: string;
+  conversation_history: ConversationEntry[];
+  topic_depth?: number;
+  force_new_topic?: boolean;
 }
 
 export interface EvaluateFollowUpRequest {

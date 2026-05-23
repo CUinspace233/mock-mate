@@ -29,6 +29,9 @@ class User(Base):
     preferences: Mapped["UserPreferences | None"] = relationship(
         "UserPreferences", back_populates="user", uselist=False
     )
+    resume: Mapped["Resume | None"] = relationship(
+        "Resume", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
 
 
 class Question(Base):
@@ -113,6 +116,24 @@ class UserPreferences(Base):
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="preferences")
+
+
+class Resume(Base):
+    __tablename__ = "resumes"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), unique=True, nullable=False, index=True
+    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_text: Mapped[str] = mapped_column(Text, nullable=False)
+    projects_json: Mapped[list[dict]] = mapped_column(JSON, default=lambda: [])
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(
+        default=datetime.now(UTC), onupdate=datetime.now(UTC)
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="resume")
 
 
 class AnswerEvaluation(Base):

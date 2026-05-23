@@ -28,6 +28,7 @@ class SessionStatus(str, Enum):
 class SessionType(str, Enum):
     PRACTICE = "practice"
     MOCK_INTERVIEW = "mock_interview"
+    RESUME_DRILL = "resume_drill"
 
 
 class QuestionType(str, Enum):
@@ -40,6 +41,12 @@ class QuestionStatus(str, Enum):
     GENERATING = "generating"
     COMPLETED = "completed"
     INTERRUPTED = "interrupted"
+
+
+class CreativityLevel(str, Enum):
+    FOCUSED = "focused"
+    BALANCED = "balanced"
+    CREATIVE = "creative"
 
 
 # User
@@ -98,10 +105,11 @@ class GenerateQuestionRequest(BaseModel):
     question_type: QuestionType | None = QuestionType.TECHNICAL
     user_id: int
     openai_api_key: str
-    openai_model: str = "gpt-4.1-nano"
+    openai_model: str = "gpt-5.4-mini"
     is_last_question: bool = False
     language: str = "en"
     session_id: str | None = None
+    creativity: CreativityLevel = CreativityLevel.BALANCED
 
 
 class GenerateQuestionResponse(BaseModel):
@@ -147,9 +155,60 @@ class GenerateFollowUpRequest(BaseModel):
     difficulty: str | None = "medium"
     user_id: int
     openai_api_key: str
-    openai_model: str = "gpt-4.1-nano"
+    openai_model: str = "gpt-5.4-mini"
     language: str = "en"
     session_id: str | None = None
+    creativity: CreativityLevel = CreativityLevel.BALANCED
+
+
+class ResumeProject(BaseModel):
+    project_id: str
+    name: str
+    role: str = ""
+    tech_stack: list[str] = []
+    summary: str = ""
+    evidence: list[str] = []
+
+
+class ResumeResource(BaseModel):
+    id: str
+    user_id: int
+    filename: str
+    content_text: str
+    projects: list[ResumeProject]
+    created_at: datetime
+    updated_at: datetime
+
+
+class UploadResumeResponse(BaseModel):
+    resume: ResumeResource
+    message: str
+
+
+class ResumeDrillQuestionRequest(BaseModel):
+    resume_id: str
+    project: ResumeProject
+    resume_summary: str = ""
+    question_number: int
+    questions_per_project: int
+    point_count: int = 3
+    followups_per_point: int = 1
+    point_number: int = 1
+    position: str
+    difficulty: Difficulty | None = Difficulty.MEDIUM
+    user_id: int
+    openai_api_key: str
+    openai_model: str = "gpt-5.4-mini"
+    language: str = "en"
+    session_id: str | None = None
+    creativity: CreativityLevel = CreativityLevel.BALANCED
+
+
+class ResumeDrillFollowUpRequest(ResumeDrillQuestionRequest):
+    original_question: str
+    conversation_history: list[ConversationEntry]
+    topic_depth: int = 1
+    force_new_topic: bool = False
 
 
 class EvaluateFollowUpRequest(BaseModel):
@@ -159,7 +218,7 @@ class EvaluateFollowUpRequest(BaseModel):
     conversation_history: list[ConversationEntry]
     session_id: str | None = None
     openai_api_key: str
-    openai_model: str = "gpt-4.1-nano"
+    openai_model: str = "gpt-5.4-mini"
 
 
 class EvaluateAnswerRequest(BaseModel):
@@ -168,7 +227,7 @@ class EvaluateAnswerRequest(BaseModel):
     answer: str
     session_id: str | None = None
     openai_api_key: str
-    openai_model: str = "gpt-4.1-nano"
+    openai_model: str = "gpt-5.4-mini"
 
 
 class EvaluationDetails(BaseModel):
@@ -464,7 +523,7 @@ class FetchNewsRequest(BaseModel):
     category: NewsCategory | None = None
     limit: int = 10
     openai_api_key: str = ""
-    openai_model: str = "gpt-4.1-nano"
+    openai_model: str = "gpt-5.4-mini"
 
 
 class FetchNewsResponse(BaseModel):

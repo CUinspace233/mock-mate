@@ -23,7 +23,7 @@
 |-------|-------------|
 | Backend | Python 3.12+, FastAPI, async SQLAlchemy, SQLite, OpenAI Responses API |
 | Frontend | React 19, TypeScript, Vite, Joy UI, Zustand, react-markdown |
-| AI | OpenAI Responses API (default: `gpt-4.1-nano`, configurable per-request) |
+| AI | OpenAI Responses API (default: `gpt-5.4-mini`, configurable per-request) |
 | Scheduling | APScheduler (news fetching every 4h, cleanup every 24h) |
 
 ## Setup
@@ -106,7 +106,7 @@ Set `NEWS_RETENTION_DAYS` in `.env` to change the default. The cleanup deletes e
 
 ## Architecture
 
-See [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) for the full system design, including:
+See [`PROJECT_INDEX.md`](./PROJECT_INDEX.md) for a navigable codebase index (API routes, components, data flows). See [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) for the full system design, including:
 - Streaming generation architecture (background thread + async flush task + SSE)
 - Session recovery flow
 - Follow-up conversation system

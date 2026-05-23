@@ -205,7 +205,7 @@ async def generate_question_from_news(
     position: str,
     category: NewsCategory,
     openai_api_key: str = "",
-    openai_model: str = "gpt-4.1-nano",
+    openai_model: str = "gpt-5.4-mini",
 ) -> tuple[GeneratedQuestion | None, str, float]:
     """Generate interview question from news item using AI"""
     try:
@@ -408,7 +408,7 @@ async def process_news_and_generate_questions(
     category: NewsCategory | None = None,
     limit: int = 10,
     openai_api_key: str = "",
-    openai_model: str = "gpt-4.1-nano",
+    openai_model: str = "gpt-5.4-mini",
 ):
     """Background task to process news and generate questions"""
     try:
@@ -441,7 +441,7 @@ async def _process_source_config(
     limit: int,
     positions: Sequence[str],
     openai_api_key: str = "",
-    openai_model: str = "gpt-4.1-nano",
+    openai_model: str = "gpt-5.4-mini",
 ) -> int:
     """Process a single source configuration and persist generated questions."""
     source = await _get_or_create_source(db, category, source_config)
@@ -590,7 +590,7 @@ async def _generate_questions_for_news_items(
     positions: Sequence[str],
     category: NewsCategory,
     openai_api_key: str = "",
-    openai_model: str = "gpt-4.1-nano",
+    openai_model: str = "gpt-5.4-mini",
 ) -> list[GeneratedNewsQuestionResult]:
     """Generate questions for all news items and return valid results."""
     if not news_items:

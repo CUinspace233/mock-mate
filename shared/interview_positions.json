@@ -1,5 +1,6 @@
 {
   "positions": [
+    { "id": "agent", "label": "Agent Engineer" },
     { "id": "frontend", "label": "Frontend Engineer" },
     { "id": "backend", "label": "Backend Engineer" },
     { "id": "fullstack", "label": "Fullstack Engineer" },

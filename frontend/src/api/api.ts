@@ -20,6 +20,10 @@ import type {
   NewsCategory,
   GetProgressResponse,
   RecoverableQuestion,
+  ResumeResource,
+  UploadResumeResponse,
+  ResumeDrillQuestionRequest,
+  ResumeDrillFollowUpRequest,
 } from "../types/interview";
 
 export async function login(username: string, password: string) {
@@ -142,6 +146,78 @@ export async function generateFollowUpStream(
 
   if (!final) throw new Error("Stream ended without final payload");
   return final;
+}
+
+async function readQuestionStream<T>(
+  url: string,
+  request: unknown,
+  onDelta: (delta: string) => void,
+  onInit?: (questionId: string) => void,
+): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    body: JSON.stringify(request),
+  });
+  if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let final: T | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() || "";
+
+    for (const chunk of parts) {
+      const lines = chunk.split("\n");
+      const eventLine = lines.find((l) => l.startsWith("event: "));
+      const dataLine = lines.find((l) => l.startsWith("data: "));
+      if (!dataLine) continue;
+
+      const payload = JSON.parse(dataLine.slice(6));
+      const evt = eventLine ? eventLine.slice(7) : "message";
+
+      if (evt === "init" && payload.question_id && onInit) onInit(payload.question_id);
+      if (evt === "content" && payload.delta) onDelta(payload.delta);
+      if (evt === "error" && payload.error) throw new Error(payload.error);
+      if (evt === "final") final = payload as T;
+    }
+  }
+
+  if (!final) throw new Error("Stream ended without final payload");
+  return final;
+}
+
+export async function generateResumeQuestionStream(
+  request: ResumeDrillQuestionRequest,
+  onDelta: (delta: string) => void,
+  onInit?: (questionId: string) => void,
+): Promise<GenerateQuestionResponse> {
+  return readQuestionStream<GenerateQuestionResponse>(
+    `${import.meta.env.VITE_API_URL}/api/questions/generate/resume/stream`,
+    request,
+    onDelta,
+    onInit,
+  );
+}
+
+export async function generateResumeFollowUpStream(
+  request: ResumeDrillFollowUpRequest,
+  onDelta: (delta: string) => void,
+  onInit?: (questionId: string) => void,
+): Promise<FollowUpStreamResponse> {
+  return readQuestionStream<FollowUpStreamResponse>(
+    `${import.meta.env.VITE_API_URL}/api/questions/generate/resume/followup/stream`,
+    request,
+    onDelta,
+    onInit,
+  );
 }
 
 export async function evaluateFollowUpConversation(
@@ -276,4 +352,37 @@ export async function recoverQuestions(
 
 export async function discardQuestion(questionId: string): Promise<void> {
   await axios.post(`${import.meta.env.VITE_API_URL}/api/questions/${questionId}/discard`);
+}
+
+export async function getCurrentResume(userId: number): Promise<ResumeResource | null> {
+  const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/resume/current`, {
+    params: { user_id: userId },
+  });
+  return res.data;
+}
+
+export async function uploadResume(params: {
+  userId: number;
+  file: File;
+  openaiApiKey: string;
+  openaiModel?: string;
+  language?: string;
+}): Promise<UploadResumeResponse> {
+  const formData = new FormData();
+  formData.append("user_id", params.userId.toString());
+  formData.append("openai_api_key", params.openaiApiKey);
+  formData.append("openai_model", params.openaiModel || "gpt-5.4-mini");
+  formData.append("language", params.language || "en");
+  formData.append("file", params.file);
+
+  const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/resume/upload`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+}
+
+export async function deleteCurrentResume(userId: number): Promise<void> {
+  await axios.delete(`${import.meta.env.VITE_API_URL}/api/resume/current`, {
+    params: { user_id: userId },
+  });
 }

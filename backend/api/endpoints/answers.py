@@ -62,7 +62,7 @@ async def evaluate_answer_ai(
     answer: str,
     expected_keywords: list[str],
     openai_api_key: str = "",
-    openai_model: str = "gpt-4.1-nano",
+    openai_model: str = "gpt-5.4-mini",
 ) -> AnswerEvaluationResult:
     """AI-powered answer evaluation using OpenAI GPT with structured output"""
     client = OpenAI(api_key=openai_api_key) if openai_api_key else OpenAI()
@@ -263,7 +263,7 @@ async def evaluate_followup_ai(
     original_question: str,
     conversation_history: list[dict],
     openai_api_key: str = "",
-    openai_model: str = "gpt-4.1-nano",
+    openai_model: str = "gpt-5.4-mini",
 ) -> AnswerEvaluationResult:
     """AI-powered evaluation of a full multi-turn interview conversation."""
     client = OpenAI(api_key=openai_api_key) if openai_api_key else OpenAI()

@@ -24,6 +24,7 @@ import {
 } from "@mui/joy";
 import {
   Chat as ChatIcon,
+  Article as ArticleIcon,
   TrendingUp as TrendingUpIcon,
   History as HistoryIcon,
   Check as CheckIcon,
@@ -36,6 +37,7 @@ import {
 import InterviewChat from "./InterviewChat.tsx";
 import InterviewHistory from "./InterviewHistory.tsx";
 import ProgressChart from "./ProgressChart.tsx";
+import ResumeDrill from "./ResumeDrill.tsx";
 import {
   startInterviewSession,
   completeSession,
@@ -43,7 +45,12 @@ import {
   recoverQuestions,
 } from "../api/api";
 import type { Message } from "../types/interview.ts";
-import { Difficulty, QuestionType, JOB_POSITION_OPTIONS } from "../types/interview";
+import {
+  CreativityLevel,
+  Difficulty,
+  QuestionType,
+  JOB_POSITION_OPTIONS,
+} from "../types/interview";
 import { getDifficultyColor } from "../utils";
 import NewsQuestionPush from "./NewsQuestionPush.tsx";
 import type { NewsQuestion } from "../types/interview.ts";
@@ -65,6 +72,8 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const setDailyQuestionDate = useAuthStore((state) => state.setDailyQuestionDate);
   const selectedPosition = useAuthStore((state) => state.selectedPosition);
   const setSelectedPosition = useAuthStore((state) => state.setSelectedPosition);
+  const selectedDifficulty = useAuthStore((state) => state.selectedDifficulty);
+  const setSelectedDifficulty = useAuthStore((state) => state.setSelectedDifficulty);
   const sessionId = useAuthStore((state) => state.sessionId);
   const setSessionId = useAuthStore((state) => state.setSessionId);
   const questionCountTarget = useAuthStore((state) => state.questionCountTarget);
@@ -75,6 +84,8 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const setLanguage = useAuthStore((state) => state.setLanguage);
   const openaiModel = useAuthStore((state) => state.openaiModel);
   const setOpenaiModel = useAuthStore((state) => state.setOpenaiModel);
+  const questionCreativity = useAuthStore((state) => state.questionCreativity);
+  const setQuestionCreativity = useAuthStore((state) => state.setQuestionCreativity);
   const encryptedApiKey = useAuthStore((state) => state.openaiApiKey);
   const setOpenaiApiKey = useAuthStore((state) => state.setOpenaiApiKey);
   const [displayApiKey, setDisplayApiKey] = useState("");
@@ -98,9 +109,9 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const [customPositionMode, setCustomPositionMode] = useState(false);
   const [customPositionInput, setCustomPositionInput] = useState("");
   const [activeTab, setActiveTab] = useState<number>(0);
+  const isResumeDrillTab = activeTab === 1;
   const [interviewStarted, setInterviewStarted] = useState<boolean>(false);
   const [isRecoveredSession, setIsRecoveredSession] = useState(false);
-  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>(Difficulty.EASY);
   const [selectedQuestionType, setSelectedQuestionType] = useState<QuestionType>(
     QuestionType.TECHNICAL,
   );
@@ -227,27 +238,31 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
     const EXCLUDED_KEYWORDS = ["tts", "transcribe", "audio", "realtime", "search"];
     const models = data.data
       .map((m) => m.id)
-      .filter((id) =>
-        ALLOWED_PREFIXES.some((prefix) => id.startsWith(prefix))
-        && !id.includes(":")
-        && !EXCLUDED_KEYWORDS.some((kw) => id.includes(kw))
+      .filter(
+        (id) =>
+          ALLOWED_PREFIXES.some((prefix) => id.startsWith(prefix)) &&
+          !id.includes(":") &&
+          !EXCLUDED_KEYWORDS.some((kw) => id.includes(kw)),
       )
       .sort((a, b) => b.localeCompare(a)); // reverse alpha: newest (4.5, 4.1) first
     setAvailableModels(models);
   }, []);
 
-  const fetchModels = useCallback(async (key: string) => {
-    try {
-      const response = await fetch("https://api.openai.com/v1/models", {
-        headers: { Authorization: `Bearer ${key}` },
-      });
-      if (response.ok) {
-        parseModels(await response.json());
+  const fetchModels = useCallback(
+    async (key: string) => {
+      try {
+        const response = await fetch("https://api.openai.com/v1/models", {
+          headers: { Authorization: `Bearer ${key}` },
+        });
+        if (response.ok) {
+          parseModels(await response.json());
+        }
+      } catch {
+        // silently fail — model list is best-effort
       }
-    } catch {
-      // silently fail — model list is best-effort
-    }
-  }, [parseModels]);
+    },
+    [parseModels],
+  );
 
   const validateOpenaiApiKey = useDebounceWithImmediate(
     async (key: string) => {
@@ -368,12 +383,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
         </Stack>
 
         {/* Header Row 2: API Key + Trending */}
-        <Stack
-          direction="row"
-          spacing={1}
-          alignItems="center"
-          sx={{ mb: 1 }}
-        >
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Input
             placeholder="OpenAI API Key"
             value={displayApiKey}
@@ -433,17 +443,30 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
           }}
         >
           <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
-            <Typography level="body-xs" sx={{ fontWeight: 700, color: "neutral.500", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.65rem" }}>
+            <Typography
+              level="body-xs"
+              sx={{
+                fontWeight: 700,
+                color: "neutral.500",
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                fontSize: "0.65rem",
+              }}
+            >
               Position
             </Typography>
             {customPositionMode ? (
               <Stack direction="row" spacing={0.5} alignItems="center">
-                <IconButton size="sm" variant="plain" onClick={() => {
-                  setCustomPositionMode(false);
-                  if (!customPositionInput.trim()) {
-                    handlePositionChange("frontend");
-                  }
-                }}>
+                <IconButton
+                  size="sm"
+                  variant="plain"
+                  onClick={() => {
+                    setCustomPositionMode(false);
+                    if (!customPositionInput.trim()) {
+                      handlePositionChange("frontend");
+                    }
+                  }}
+                >
                   <ArrowBackIcon sx={{ fontSize: 16 }} />
                 </IconButton>
                 <Input
@@ -462,16 +485,24 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
                 />
               </Stack>
             ) : (
-              <Select variant="plain" value={selectedPosition} onChange={(_, value) => {
-                if (value === "__custom__") {
-                  setCustomPositionMode(true);
-                  setCustomPositionInput("");
-                } else if (value) {
-                  handlePositionChange(value);
-                }
-              }} size="sm" sx={{ minWidth: { xs: 110, md: 140 } }}>
+              <Select
+                variant="plain"
+                value={selectedPosition}
+                onChange={(_, value) => {
+                  if (value === "__custom__") {
+                    setCustomPositionMode(true);
+                    setCustomPositionInput("");
+                  } else if (value) {
+                    handlePositionChange(value);
+                  }
+                }}
+                size="sm"
+                sx={{ minWidth: { xs: 110, md: 140 } }}
+              >
                 {JOB_POSITION_OPTIONS.filter((p) => p.value !== "__custom__").map((position) => (
-                  <Option key={position.value} value={position.value}>{position.label}</Option>
+                  <Option key={position.value} value={position.value}>
+                    {position.label}
+                  </Option>
                 ))}
                 <Divider sx={{ my: 0.5 }} />
                 <Option value="__custom__" sx={{ color: "primary.600", fontWeight: 600 }}>
@@ -483,70 +514,178 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
 
           <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
 
+          {!isResumeDrillTab && (
+            <>
+              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+                <Typography
+                  level="body-xs"
+                  sx={{
+                    fontWeight: 700,
+                    color: "neutral.500",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    fontSize: "0.65rem",
+                  }}
+                >
+                  Type
+                </Typography>
+                <Select
+                  variant="plain"
+                  value={selectedQuestionType}
+                  onChange={(_, value) => value && setSelectedQuestionType(value as QuestionType)}
+                  size="sm"
+                  sx={{ minWidth: { xs: 95, md: 120 } }}
+                >
+                  <Option value={QuestionType.TECHNICAL}>Technical</Option>
+                  <Option value={QuestionType.BEHAVIORAL}>Behavioral</Option>
+                  <Option value={QuestionType.OPINION}>Opinion</Option>
+                </Select>
+              </Stack>
+
+              <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
+            </>
+          )}
+
           <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
-            <Typography level="body-xs" sx={{ fontWeight: 700, color: "neutral.500", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.65rem" }}>
-              Type
+            <Typography
+              level="body-xs"
+              sx={{
+                fontWeight: 700,
+                color: "neutral.500",
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                fontSize: "0.65rem",
+              }}
+            >
+              <Box component="span" sx={{ display: { xs: "none", md: "inline" } }}>
+                Difficulty
+              </Box>
+              <Box component="span" sx={{ display: { xs: "inline", md: "none" } }}>
+                Diff
+              </Box>
             </Typography>
-            <Select variant="plain" value={selectedQuestionType} onChange={(_, value) => value && setSelectedQuestionType(value as QuestionType)} size="sm" sx={{ minWidth: { xs: 95, md: 120 } }}>
-              <Option value={QuestionType.TECHNICAL}>Technical</Option>
-              <Option value={QuestionType.BEHAVIORAL}>Behavioral</Option>
-              <Option value={QuestionType.OPINION}>Opinion</Option>
+            <Select
+              variant="plain"
+              value={selectedDifficulty}
+              onChange={(_, value) => value && setSelectedDifficulty(value as Difficulty)}
+              color={getDifficultyColor(selectedDifficulty) as ColorPaletteProp}
+              size="sm"
+              sx={{ minWidth: 75 }}
+            >
+              <Option value={Difficulty.EASY}>
+                <Chip color="success" variant="soft" size="sm">
+                  Easy
+                </Chip>
+              </Option>
+              <Option value={Difficulty.MEDIUM}>
+                <Chip color="warning" variant="soft" size="sm">
+                  Medium
+                </Chip>
+              </Option>
+              <Option value={Difficulty.HARD}>
+                <Chip color="danger" variant="soft" size="sm">
+                  Hard
+                </Chip>
+              </Option>
             </Select>
           </Stack>
 
           <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
 
+          {!isResumeDrillTab && (
+            <>
+              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+                <Typography
+                  level="body-xs"
+                  sx={{
+                    fontWeight: 700,
+                    color: "neutral.500",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    fontSize: "0.65rem",
+                  }}
+                >
+                  <Box component="span" sx={{ display: { xs: "none", md: "inline" } }}>
+                    Questions
+                  </Box>
+                  <Box component="span" sx={{ display: { xs: "inline", md: "none" } }}>
+                    Qty
+                  </Box>
+                </Typography>
+                <Select
+                  variant="plain"
+                  value={questionCountTarget}
+                  onChange={(_, value) => value && setQuestionCountTarget(value as number)}
+                  size="sm"
+                  sx={{ minWidth: 50 }}
+                >
+                  <Option value={3}>3</Option>
+                  <Option value={5}>5</Option>
+                  <Option value={8}>8</Option>
+                  <Option value={10}>10</Option>
+                </Select>
+              </Stack>
+
+              <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
+
+              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+                <Typography
+                  level="body-xs"
+                  sx={{
+                    fontWeight: 700,
+                    color: "neutral.500",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    fontSize: "0.65rem",
+                  }}
+                >
+                  Follow-ups
+                </Typography>
+                <Select
+                  variant="plain"
+                  value={followUpLimit}
+                  onChange={(_, value) => value !== null && setFollowUpLimit(value as number)}
+                  size="sm"
+                  sx={{ minWidth: 50 }}
+                >
+                  <Option value={0}>Off</Option>
+                  <Option value={1}>1</Option>
+                  <Option value={2}>2</Option>
+                  <Option value={3}>3</Option>
+                  <Option value={4}>4</Option>
+                  <Option value={5}>5</Option>
+                </Select>
+              </Stack>
+
+              <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
+            </>
+          )}
+
           <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
-            <Typography level="body-xs" sx={{ fontWeight: 700, color: "neutral.500", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.65rem" }}>
-              <Box component="span" sx={{ display: { xs: "none", md: "inline" } }}>Difficulty</Box>
-              <Box component="span" sx={{ display: { xs: "inline", md: "none" } }}>Diff</Box>
+            <Typography
+              level="body-xs"
+              sx={{
+                fontWeight: 700,
+                color: "neutral.500",
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                fontSize: "0.65rem",
+              }}
+            >
+              <Box component="span" sx={{ display: { xs: "none", md: "inline" } }}>
+                Language
+              </Box>
+              <Box component="span" sx={{ display: { xs: "inline", md: "none" } }}>
+                Lang
+              </Box>
             </Typography>
-            <Select variant="plain" value={selectedDifficulty} onChange={(_, value) => value && setSelectedDifficulty(value as Difficulty)} color={getDifficultyColor(selectedDifficulty) as ColorPaletteProp} size="sm" sx={{ minWidth: 75 }}>
-              <Option value={Difficulty.EASY}><Chip color="success" variant="soft" size="sm">Easy</Chip></Option>
-              <Option value={Difficulty.MEDIUM}><Chip color="warning" variant="soft" size="sm">Medium</Chip></Option>
-              <Option value={Difficulty.HARD}><Chip color="danger" variant="soft" size="sm">Hard</Chip></Option>
-            </Select>
-          </Stack>
-
-          <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
-
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
-            <Typography level="body-xs" sx={{ fontWeight: 700, color: "neutral.500", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.65rem" }}>
-              <Box component="span" sx={{ display: { xs: "none", md: "inline" } }}>Questions</Box>
-              <Box component="span" sx={{ display: { xs: "inline", md: "none" } }}>Qty</Box>
-            </Typography>
-            <Select variant="plain" value={questionCountTarget} onChange={(_, value) => value && setQuestionCountTarget(value as number)} size="sm" sx={{ minWidth: 50 }}>
-              <Option value={3}>3</Option>
-              <Option value={5}>5</Option>
-              <Option value={8}>8</Option>
-              <Option value={10}>10</Option>
-            </Select>
-          </Stack>
-
-          <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
-
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
-            <Typography level="body-xs" sx={{ fontWeight: 700, color: "neutral.500", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.65rem" }}>
-Follow-ups
-            </Typography>
-            <Select variant="plain" value={followUpLimit} onChange={(_, value) => value !== null && setFollowUpLimit(value as number)} size="sm" sx={{ minWidth: 50 }}>
-              <Option value={0}>Off</Option>
-              <Option value={1}>1</Option>
-              <Option value={2}>2</Option>
-              <Option value={3}>3</Option>
-              <Option value={4}>4</Option>
-              <Option value={5}>5</Option>
-            </Select>
-          </Stack>
-
-          <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
-
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
-            <Typography level="body-xs" sx={{ fontWeight: 700, color: "neutral.500", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.65rem" }}>
-              <Box component="span" sx={{ display: { xs: "none", md: "inline" } }}>Language</Box>
-              <Box component="span" sx={{ display: { xs: "inline", md: "none" } }}>Lang</Box>
-            </Typography>
-            <Select variant="plain" value={language} onChange={(_, value) => value && setLanguage(value as string)} size="sm" sx={{ minWidth: 75 }}>
+            <Select
+              variant="plain"
+              value={language}
+              onChange={(_, value) => value && setLanguage(value as string)}
+              size="sm"
+              sx={{ minWidth: 75 }}
+            >
               <Option value="en">English</Option>
               <Option value="zh">中文</Option>
               <Option value="ja">日本語</Option>
@@ -556,27 +695,72 @@ Follow-ups
 
           <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
 
+          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
+            <Typography
+              level="body-xs"
+              sx={{
+                fontWeight: 700,
+                color: "neutral.500",
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                fontSize: "0.65rem",
+              }}
+            >
+              Creativity
+            </Typography>
+            <Select
+              variant="plain"
+              size="sm"
+              value={questionCreativity}
+              onChange={(_, value) => value && setQuestionCreativity(value as CreativityLevel)}
+              sx={{ minWidth: 104 }}
+            >
+              <Option value={CreativityLevel.FOCUSED}>Focused</Option>
+              <Option value={CreativityLevel.BALANCED}>Balanced</Option>
+              <Option value={CreativityLevel.CREATIVE}>Creative</Option>
+            </Select>
+          </Stack>
+
+          <Divider orientation="vertical" sx={{ display: { xs: "none", lg: "block" } }} />
+
           <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
-            <Typography level="body-xs" sx={{ fontWeight: 700, color: "neutral.500", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.65rem" }}>
+            <Typography
+              level="body-xs"
+              sx={{
+                fontWeight: 700,
+                color: "neutral.500",
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                fontSize: "0.65rem",
+              }}
+            >
               Model
             </Typography>
-            <Select variant="plain" value={openaiModel} onChange={(_, value) => value && setOpenaiModel(value as string)} size="sm" sx={{ minWidth: { xs: 120, md: 160 } }}>
+            <Select
+              variant="plain"
+              value={openaiModel}
+              onChange={(_, value) => value && setOpenaiModel(value as string)}
+              size="sm"
+              sx={{ minWidth: { xs: 120, md: 160 } }}
+            >
               {availableModels.length > 0 ? (
                 availableModels.map((model) => (
-                  <Option key={model} value={model}>{model}</Option>
+                  <Option key={model} value={model}>
+                    {model}
+                  </Option>
                 ))
               ) : (
-                <Option value="gpt-4.1-nano">gpt-4.1-nano</Option>
+                <>
+                  <Option value="gpt-5.4-mini">gpt-5.4-mini</Option>
+                  <Option value="gpt-4.1-nano">gpt-4.1-nano</Option>
+                </>
               )}
             </Select>
           </Stack>
         </Box>
 
         {/* Main Content Tabs */}
-        <Tabs
-          value={activeTab}
-          onChange={(_, value) => setActiveTab(value as number)}
-        >
+        <Tabs value={activeTab} onChange={(_, value) => setActiveTab(value as number)}>
           <TabList
             sx={{
               bgcolor: "neutral.100",
@@ -602,8 +786,17 @@ Follow-ups
           >
             <Tab>
               <ChatIcon sx={{ mr: 0.5, fontSize: { xs: 18, sm: 20 } }} />
-              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Interview </Box>
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                Interview{" "}
+              </Box>
               Chat
+            </Tab>
+            <Tab>
+              <ArticleIcon sx={{ mr: 0.5, fontSize: { xs: 18, sm: 20 } }} />
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                Resume{" "}
+              </Box>
+              Drill
             </Tab>
             <Tab>
               <HistoryIcon sx={{ mr: 0.5, fontSize: { xs: 18, sm: 20 } }} />
@@ -611,14 +804,20 @@ Follow-ups
             </Tab>
             <Tab>
               <TrendingUpIcon sx={{ mr: 0.5, fontSize: { xs: 18, sm: 20 } }} />
-              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Progress </Box>
-              <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>Stats</Box>
-              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Trend</Box>
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                Progress{" "}
+              </Box>
+              <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
+                Stats
+              </Box>
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                Trend
+              </Box>
             </Tab>
           </TabList>
 
           <Card variant="outlined" sx={{ boxShadow: "sm" }}>
-            <TabPanel value={0} sx={{ p: 0 }}>
+            <TabPanel value={0} keepMounted sx={{ p: 0 }}>
               <InterviewChat
                 selectedPosition={selectedPosition}
                 selectedDifficulty={selectedDifficulty}
@@ -644,14 +843,27 @@ Follow-ups
                 followUpLimit={followUpLimit}
                 language={language}
                 openaiModel={openaiModel}
+                questionCreativity={questionCreativity}
               />
             </TabPanel>
 
-            <TabPanel value={1} sx={{ p: 0 }}>
+            <TabPanel value={1} keepMounted sx={{ p: 0 }}>
+              <ResumeDrill
+                userId={user_id || 0}
+                selectedPosition={selectedPosition}
+                selectedDifficulty={selectedDifficulty}
+                openaiApiKey={displayApiKey}
+                openaiModel={openaiModel}
+                language={language}
+                questionCreativity={questionCreativity}
+              />
+            </TabPanel>
+
+            <TabPanel value={2} keepMounted sx={{ p: 0 }}>
               <InterviewHistory selectedPosition={selectedPosition} />
             </TabPanel>
 
-            <TabPanel value={2} sx={{ p: 0 }}>
+            <TabPanel value={3} keepMounted sx={{ p: 0 }}>
               <ProgressChart userId={user_id || 0} selectedPosition={selectedPosition} />
             </TabPanel>
           </Card>

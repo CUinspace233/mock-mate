@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { encryptApiKey, decryptApiKey } from "../crypto";
+import { CreativityLevel, Difficulty } from "../types/interview";
 
 type AuthState = {
   isLoggedIn: boolean;
@@ -9,6 +10,7 @@ type AuthState = {
   dailyQuestionCount: number;
   dailyQuestionDate: string;
   selectedPosition: string;
+  selectedDifficulty: Difficulty;
   sessionId: string | null;
   questionCountTarget: number;
   setQuestionCountTarget: (count: number) => void;
@@ -18,12 +20,15 @@ type AuthState = {
   setLanguage: (language: string) => void;
   openaiModel: string;
   setOpenaiModel: (model: string) => void;
+  questionCreativity: CreativityLevel;
+  setQuestionCreativity: (creativity: CreativityLevel) => void;
   openaiApiKey: string; // stored encrypted
   setOpenaiApiKey: (apiKey: string) => void;
   getDecryptedApiKey: () => Promise<string>;
   setDailyQuestionCount: (count: number) => void;
   setDailyQuestionDate: (date: string) => void;
   setSelectedPosition: (position: string) => void;
+  setSelectedDifficulty: (difficulty: Difficulty) => void;
   setSessionId: (sessionId: string | null) => void;
   login: (username: string, user_id: number) => void;
   register: (username: string) => void;
@@ -41,6 +46,7 @@ export const useAuthStore = create<AuthState>()(
       dailyQuestionCount: 0,
       dailyQuestionDate: "",
       selectedPosition: "frontend",
+      selectedDifficulty: Difficulty.EASY,
       sessionId: null,
       questionCountTarget: 5,
       setQuestionCountTarget: (count) => set({ questionCountTarget: count }),
@@ -48,8 +54,10 @@ export const useAuthStore = create<AuthState>()(
       setFollowUpLimit: (limit) => set({ followUpLimit: limit }),
       language: "en",
       setLanguage: (language) => set({ language }),
-      openaiModel: "gpt-4.1-nano",
+      openaiModel: "gpt-5.4-mini",
       setOpenaiModel: (model) => set({ openaiModel: model }),
+      questionCreativity: CreativityLevel.BALANCED,
+      setQuestionCreativity: (creativity) => set({ questionCreativity: creativity }),
       openaiApiKey: "",
       setOpenaiApiKey: (apiKey) => {
         const ver = ++encryptVersion;
@@ -63,6 +71,7 @@ export const useAuthStore = create<AuthState>()(
       setDailyQuestionCount: (count) => set({ dailyQuestionCount: count }),
       setDailyQuestionDate: (date) => set({ dailyQuestionDate: date }),
       setSelectedPosition: (position) => set({ selectedPosition: position }),
+      setSelectedDifficulty: (difficulty) => set({ selectedDifficulty: difficulty }),
       setSessionId: (sessionId) => set({ sessionId }),
       login: (username, user_id) => set({ isLoggedIn: true, username, user_id }),
       register: (username) => set({ isLoggedIn: true, username }),
@@ -77,11 +86,13 @@ export const useAuthStore = create<AuthState>()(
         dailyQuestionCount: state.dailyQuestionCount,
         dailyQuestionDate: state.dailyQuestionDate,
         selectedPosition: state.selectedPosition,
+        selectedDifficulty: state.selectedDifficulty,
         sessionId: state.sessionId,
         questionCountTarget: state.questionCountTarget,
         followUpLimit: state.followUpLimit,
         language: state.language,
         openaiModel: state.openaiModel,
+        questionCreativity: state.questionCreativity,
         openaiApiKey: state.openaiApiKey,
       }),
     },

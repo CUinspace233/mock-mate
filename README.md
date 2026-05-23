@@ -6,12 +6,26 @@
 
 ## Introduction
 
-**MockMate** is an AI-powered interview practice platform that simulates real-world technical interviews. It features **streaming question generation with incremental persistence**, multi-turn follow-up conversations, structured answer evaluation, session recovery, and trending news-based interview questions — all designed for a realistic and resilient interview experience.
+**MockMate** is an AI-powered interview practice platform that simulates real-world technical interviews. It features **streaming question generation with incremental persistence**, multi-turn follow-up conversations, structured answer evaluation, session recovery, resume-based project drilling, and trending news-based interview questions — all designed for a realistic and resilient interview experience.
+
+## Major Update: Resume Drill
+
+MockMate 2.0.0 introduces **Resume Drill**, a focused "resume grilling" mode for project-based interview practice. Upload a PDF, TXT, or Markdown resume, let MockMate extract your project experience, then run a strict but constructive interview loop against each project.
+
+### Resume Drill Highlights
+
+- **Resume Upload and Parsing** — Upload a resume directly in the training UI; MockMate extracts project entries and supporting evidence
+- **Project-by-project Drilling** — Pick a parsed project and receive targeted questions about architecture, trade-offs, technical decisions, and real ownership
+- **Streaming Resume Questions** — Resume drill questions and follow-ups stream through SSE for the same real-time interview feel as normal training
+- **Answer Evaluation** — Each resume drill answer is evaluated with the existing structured scoring flow
+- **Draft Recovery** — Active resume drill state is saved locally so you can refresh or return without losing progress
+- **Resume Management** — Replace or delete the current resume from the UI when your experience changes
 
 ### Key Features
 
 - **Streaming AI Questions** — Real-time SSE streaming with background persistence; generation continues server-side even if you close the tab
 - **Multi-turn Follow-ups** — AI probes deeper with follow-up questions based on your answers
+- **Resume Drill** — Upload a resume and practice rigorous project-specific questioning based on your own experience
 - **Structured Evaluation** — Scoring across technical accuracy, communication clarity, completeness, and practical experience
 - **Session Recovery** — Refresh or return later; your interview session and questions are restored from the server
 - **News-based Questions** — Trending tech news automatically generates relevant interview questions
@@ -110,6 +124,7 @@ See [`PROJECT_INDEX.md`](./PROJECT_INDEX.md) for a navigable codebase index (API
 - Streaming generation architecture (background thread + async flush task + SSE)
 - Session recovery flow
 - Follow-up conversation system
+- Resume drill upload, parsing, and project-question flow
 - News processing pipeline
 
 For interactive documentation, visit this repo's [DeepWiki](https://deepwiki.com/CUinspace233/mock-mate).

@@ -92,7 +92,7 @@ EOF
 chmod 600 .env
 
 # Quick test
-uvicorn main:app --host 127.0.0.1 --port 5200 &
+./.venv/bin/uvicorn main:app --host 127.0.0.1 --port 5200 &
 curl http://127.0.0.1:5200/health
 # Should return: {"status":"healthy","version":"1.0.0"}
 kill %1
@@ -118,8 +118,8 @@ npm run build
 Find the exact paths first:
 
 ```bash
-which uvicorn
-# Should be something like: /root/miniconda3/envs/mockmate/bin/uvicorn
+realpath .venv/bin/uvicorn
+# Should be something like: /root/mock-mate/backend/.venv/bin/uvicorn
 
 node -e "console.log(process.execPath)"
 # Should be something like: /root/.nvm/versions/node/v20.x.x/bin/node
@@ -139,8 +139,8 @@ WorkingDirectory=/root/mock-mate/backend
 Environment=HOME=/root
 Environment=LANG=en_US.UTF-8
 Environment=PYTHONIOENCODING=utf-8
-Environment=PATH=/root/miniconda3/envs/mockmate/bin:/root/.nvm/versions/node/v20.20.0/bin:/usr/local/bin:/usr/bin
-ExecStart=/root/miniconda3/envs/mockmate/bin/uvicorn main:app --host 127.0.0.1 --port 5200
+Environment=PATH=/root/mock-mate/backend/.venv/bin:/root/.nvm/versions/node/v20.20.0/bin:/usr/local/bin:/usr/bin
+ExecStart=/root/mock-mate/backend/.venv/bin/uvicorn main:app --host 127.0.0.1 --port 5200
 Restart=always
 RestartSec=5
 

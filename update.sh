@@ -2,7 +2,6 @@
 set -euo pipefail
 
 APP_DIR="/root/mock-mate"
-CONDA_SH="/root/miniconda3/etc/profile.d/conda.sh"
 NVM_SH="/root/.nvm/nvm.sh"
 
 echo "[1/5] Pull latest code..."
@@ -10,14 +9,12 @@ cd "$APP_DIR"
 git pull
 
 echo "[2/5] Update backend dependencies..."
-if [[ ! -f "$CONDA_SH" ]]; then
-  echo "Conda init script not found: $CONDA_SH"
+if ! command -v uv >/dev/null 2>&1; then
+  echo "uv is not installed or not on PATH"
   exit 1
 fi
-source "$CONDA_SH"
-conda activate mockmate
 cd "$APP_DIR/backend"
-uv sync
+uv sync --frozen
 
 echo "[3/5] Restart backend service..."
 systemctl restart mockmate

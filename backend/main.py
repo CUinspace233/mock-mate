@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
         for col_sql in [
             "ALTER TABLE questions ADD COLUMN status VARCHAR(20) DEFAULT 'completed'",
             "ALTER TABLE questions ADD COLUMN session_id VARCHAR REFERENCES interview_sessions(id)",
+            "ALTER TABLE resumes ADD COLUMN extraction_status VARCHAR(20) DEFAULT 'unknown' NOT NULL",
         ]:
             try:
                 await conn.execute(text(col_sql))

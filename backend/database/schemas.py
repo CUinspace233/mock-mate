@@ -31,6 +31,12 @@ class SessionType(str, Enum):
     RESUME_DRILL = "resume_drill"
 
 
+class ResumeExtractionStatus(str, Enum):
+    AI = "ai"
+    FALLBACK = "fallback"
+    UNKNOWN = "unknown"
+
+
 class QuestionType(str, Enum):
     OPINION = "opinion"
     TECHNICAL = "technical"
@@ -176,6 +182,7 @@ class ResumeResource(BaseModel):
     filename: str
     content_text: str
     projects: list[ResumeProject]
+    extraction_status: ResumeExtractionStatus = ResumeExtractionStatus.UNKNOWN
     created_at: datetime
     updated_at: datetime
 

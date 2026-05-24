@@ -1,22 +1,33 @@
+import asyncio
 import io
 import json
+import logging
 import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
-from openai import OpenAI
+from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI, RateLimitError
+from pydantic import ValidationError
 from pypdf import PdfReader
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_db
 from database import models
-from database.schemas import ResumeProject, ResumeResource, UploadResumeResponse
+from database.schemas import (
+    ResumeExtractionStatus,
+    ResumeProject,
+    ResumeResource,
+    UploadResumeResponse,
+)
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 MAX_RESUME_BYTES = 5 * 1024 * 1024
+MAX_PROJECT_EXTRACTION_ATTEMPTS = 3
 SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md"}
+RETRYABLE_OPENAI_ERRORS = (APIConnectionError, APITimeoutError, RateLimitError)
 
 PROJECT_EXTRACTION_TEXT_FORMAT = {
     "format": {
@@ -107,12 +118,18 @@ def _extract_text(filename: str, content: bytes) -> str:
 
 
 def _resume_to_resource(resume: models.Resume) -> ResumeResource:
+    try:
+        extraction_status = ResumeExtractionStatus(resume.extraction_status)
+    except ValueError:
+        extraction_status = ResumeExtractionStatus.UNKNOWN
+
     return ResumeResource(
         id=str(resume.id),
         user_id=resume.user_id,
         filename=resume.filename,
         content_text=resume.content_text,
         projects=[ResumeProject(**project) for project in (resume.projects_json or [])],
+        extraction_status=extraction_status,
         created_at=resume.created_at or datetime.now(UTC),
         updated_at=resume.updated_at or resume.created_at or datetime.now(UTC),
     )
@@ -133,7 +150,67 @@ def _fallback_projects(text: str) -> list[dict]:
     ]
 
 
-async def _extract_projects_with_ai(
+def _normalize_projects(projects: list[dict]) -> list[dict]:
+    normalized = []
+    for project in projects:
+        normalized.append(
+            ResumeProject(
+                project_id=str(project.get("project_id") or uuid.uuid4()),
+                name=str(project.get("name") or "Resume Experience"),
+                role=str(project.get("role") or ""),
+                tech_stack=[
+                    str(item) for item in (project.get("tech_stack") or []) if str(item).strip()
+                ],
+                summary=str(project.get("summary") or ""),
+                evidence=[
+                    str(item) for item in (project.get("evidence") or []) if str(item).strip()
+                ],
+            ).model_dump()
+        )
+    return normalized
+
+
+def _passes_project_quality_gate(projects: list[dict]) -> bool:
+    if not projects:
+        return False
+
+    for project in projects:
+        name = str(project.get("name") or "").strip()
+        summary = str(project.get("summary") or "").strip()
+        evidence = [
+            str(item).strip() for item in project.get("evidence") or [] if str(item).strip()
+        ]
+        if name and name != "Resume Experience" and (summary or evidence):
+            return True
+
+    return False
+
+
+def _is_retryable_openai_error(exc: Exception) -> bool:
+    if isinstance(exc, RETRYABLE_OPENAI_ERRORS):
+        return True
+    if isinstance(exc, APIStatusError):
+        return exc.status_code >= 500
+    return False
+
+
+def _should_retry_project_extraction(exc: Exception) -> bool:
+    if _is_retryable_openai_error(exc):
+        return True
+    return isinstance(
+        exc,
+        (
+            AttributeError,
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            ValueError,
+            ValidationError,
+        ),
+    )
+
+
+def _call_project_extraction(
     text: str,
     openai_api_key: str,
     openai_model: str,
@@ -161,39 +238,64 @@ Resume:
 {text[:24000]}
 """
 
-    try:
-        response = client.responses.create(
-            model=openai_model,
-            instructions=(
-                "You are a strict resume parser. Extract only evidence-backed project entries "
-                "and return valid structured JSON."
-            ),
-            input=prompt,
-            max_output_tokens=1800,
-            temperature=0.2,
-            text=PROJECT_EXTRACTION_TEXT_FORMAT,
-        )
-        payload = json.loads(response.output_text or "{}")
-        projects = payload.get("projects") or []
-        normalized = []
-        for project in projects:
-            normalized.append(
-                ResumeProject(
-                    project_id=str(project.get("project_id") or uuid.uuid4()),
-                    name=str(project.get("name") or "Resume Experience"),
-                    role=str(project.get("role") or ""),
-                    tech_stack=[
-                        str(item) for item in (project.get("tech_stack") or []) if str(item).strip()
-                    ],
-                    summary=str(project.get("summary") or ""),
-                    evidence=[
-                        str(item) for item in (project.get("evidence") or []) if str(item).strip()
-                    ],
-                ).model_dump()
+    response = client.responses.create(
+        model=openai_model,
+        instructions=(
+            "You are a strict resume parser. Extract only evidence-backed project entries "
+            "and return valid structured JSON."
+        ),
+        input=prompt,
+        max_output_tokens=1800,
+        temperature=0,
+        text=PROJECT_EXTRACTION_TEXT_FORMAT,
+    )
+    payload = json.loads(response.output_text or "{}")
+    projects = payload.get("projects") or []
+    return _normalize_projects(projects)
+
+
+async def _extract_projects_with_ai(
+    text: str,
+    openai_api_key: str,
+    openai_model: str,
+    language: str,
+) -> tuple[list[dict], str]:
+    last_error: Exception | None = None
+
+    for attempt in range(1, MAX_PROJECT_EXTRACTION_ATTEMPTS + 1):
+        try:
+            projects = await asyncio.to_thread(
+                _call_project_extraction,
+                text,
+                openai_api_key,
+                openai_model,
+                language,
             )
-        return normalized or _fallback_projects(text)
-    except Exception:
-        return _fallback_projects(text)
+            if _passes_project_quality_gate(projects):
+                return projects, "ai"
+
+            last_error = ValueError("Project extraction did not meet the quality gate.")
+            logger.warning(
+                "Resume project extraction failed quality gate on attempt %s/%s",
+                attempt,
+                MAX_PROJECT_EXTRACTION_ATTEMPTS,
+            )
+        except Exception as exc:
+            last_error = exc
+            logger.warning(
+                "Resume project extraction failed on attempt %s/%s: %s",
+                attempt,
+                MAX_PROJECT_EXTRACTION_ATTEMPTS,
+                exc,
+            )
+            if not _should_retry_project_extraction(exc):
+                break
+
+        if attempt < MAX_PROJECT_EXTRACTION_ATTEMPTS:
+            await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
+
+    logger.warning("Falling back to heuristic resume project extraction: %s", last_error)
+    return _fallback_projects(text), "fallback"
 
 
 @router.get("/current", response_model=ResumeResource | None)
@@ -229,7 +331,9 @@ async def upload_resume(
         )
 
     text = _extract_text(filename, content)
-    projects = await _extract_projects_with_ai(text, openai_api_key, openai_model, language)
+    projects, extraction_status = await _extract_projects_with_ai(
+        text, openai_api_key, openai_model, language
+    )
 
     await db.execute(delete(models.Resume).where(models.Resume.user_id == user_id))
     resume = models.Resume(
@@ -237,6 +341,7 @@ async def upload_resume(
         filename=filename,
         content_text=text,
         projects_json=projects,
+        extraction_status=extraction_status,
     )
     db.add(resume)
     await db.commit()
@@ -244,7 +349,11 @@ async def upload_resume(
 
     return UploadResumeResponse(
         resume=_resume_to_resource(resume),
-        message="Resume uploaded and parsed.",
+        message=(
+            "Resume uploaded and parsed."
+            if extraction_status == "ai"
+            else "Resume uploaded, but project extraction used a fallback parser."
+        ),
     )
 
 

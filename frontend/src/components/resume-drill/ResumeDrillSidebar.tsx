@@ -31,6 +31,12 @@ function extractionStatusLabel(status: ResumeResource["extraction_status"]) {
   return "Parser status unknown";
 }
 
+function extractionStatusColor(status: ResumeResource["extraction_status"]) {
+  if (status === "ai") return "success";
+  if (status === "fallback") return "warning";
+  return "neutral";
+}
+
 interface ResumeDrillSidebarProps {
   resume: ResumeResource | null;
   projects: ResumeProject[];
@@ -131,7 +137,7 @@ export default function ResumeDrillSidebar({
                       <Chip
                         size="sm"
                         variant="soft"
-                        color={resume.extraction_status === "fallback" ? "warning" : "success"}
+                        color={extractionStatusColor(resume.extraction_status)}
                       >
                         {extractionStatusLabel(resume.extraction_status)}
                       </Chip>

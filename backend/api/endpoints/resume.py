@@ -14,7 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_db
 from database import models
-from database.schemas import ResumeProject, ResumeResource, UploadResumeResponse
+from database.schemas import (
+    ResumeExtractionStatus,
+    ResumeProject,
+    ResumeResource,
+    UploadResumeResponse,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -113,13 +118,18 @@ def _extract_text(filename: str, content: bytes) -> str:
 
 
 def _resume_to_resource(resume: models.Resume) -> ResumeResource:
+    try:
+        extraction_status = ResumeExtractionStatus(resume.extraction_status)
+    except ValueError:
+        extraction_status = ResumeExtractionStatus.UNKNOWN
+
     return ResumeResource(
         id=str(resume.id),
         user_id=resume.user_id,
         filename=resume.filename,
         content_text=resume.content_text,
         projects=[ResumeProject(**project) for project in (resume.projects_json or [])],
-        extraction_status=resume.extraction_status,
+        extraction_status=extraction_status,
         created_at=resume.created_at or datetime.now(UTC),
         updated_at=resume.updated_at or resume.created_at or datetime.now(UTC),
     )

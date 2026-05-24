@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   Divider,
   IconButton,
   Option,
@@ -23,6 +24,12 @@ import type { ResumeProject, ResumeResource } from "../../types/interview";
 
 const DRILL_POINT_OPTIONS = [1, 2, 3, 5];
 const FOLLOW_UP_ROUND_OPTIONS = [1, 2, 3];
+
+function extractionStatusLabel(status: ResumeResource["extraction_status"]) {
+  if (status === "ai") return "AI parsed";
+  if (status === "fallback") return "Fallback parser";
+  return "Parser status unknown";
+}
 
 interface ResumeDrillSidebarProps {
   resume: ResumeResource | null;
@@ -117,9 +124,18 @@ export default function ResumeDrillSidebar({
                     <Typography level="title-sm" noWrap>
                       {resume.filename}
                     </Typography>
-                    <Typography level="body-xs" sx={{ color: "neutral.500" }}>
-                      {resume.projects.length} projects parsed
-                    </Typography>
+                    <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap">
+                      <Typography level="body-xs" sx={{ color: "neutral.500" }}>
+                        {resume.projects.length} projects parsed
+                      </Typography>
+                      <Chip
+                        size="sm"
+                        variant="soft"
+                        color={resume.extraction_status === "fallback" ? "warning" : "success"}
+                      >
+                        {extractionStatusLabel(resume.extraction_status)}
+                      </Chip>
+                    </Stack>
                   </Box>
                 </Stack>
                 <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>

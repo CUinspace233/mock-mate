@@ -176,6 +176,7 @@ class ResumeResource(BaseModel):
     filename: str
     content_text: str
     projects: list[ResumeProject]
+    extraction_status: str = "unknown"
     created_at: datetime
     updated_at: datetime
 

@@ -126,6 +126,7 @@ export interface ResumeResource {
   filename: string;
   content_text: string;
   projects: ResumeProject[];
+  extraction_status: "ai" | "fallback" | "unknown";
   created_at: string;
   updated_at: string;
 }

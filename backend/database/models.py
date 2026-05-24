@@ -128,6 +128,7 @@ class Resume(Base):
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     content_text: Mapped[str] = mapped_column(Text, nullable=False)
     projects_json: Mapped[list[dict]] = mapped_column(JSON, default=lambda: [])
+    extraction_status: Mapped[str] = mapped_column(String(20), default="unknown", nullable=False)
     created_at: Mapped[datetime] = mapped_column(default=datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(
         default=datetime.now(UTC), onupdate=datetime.now(UTC)

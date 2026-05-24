@@ -25,7 +25,6 @@ import {
   type ConversationEntry,
   type EvaluateAnswerResponse,
   type Message,
-  type ResumeProject,
   type ResumeResource,
 } from "../types/interview";
 
@@ -62,6 +61,7 @@ type ResumeDrillDraft = {
 };
 
 const draftKey = (userId: number) => `resume-drill-draft:${userId}`;
+const RECORD_SECTION_SEPARATOR = "\n---\n";
 
 const serializeMessage = (message: Message): PersistedMessage => ({
   ...message,
@@ -92,15 +92,15 @@ function formatEvaluationContent(evaluation: EvaluateAnswerResponse): string {
   return content;
 }
 
-function projectContext(project: ResumeProject): string {
-  return [
-    `Project: ${project.name}`,
-    project.role ? `Role: ${project.role}` : "",
-    project.tech_stack.length ? `Tech: ${project.tech_stack.join(", ")}` : "",
-    project.summary,
-  ]
+function formatConversationEntries(
+  history: ConversationEntry[],
+  role: ConversationEntry["role"],
+): string {
+  return history
+    .filter((entry) => entry.role === role)
+    .map((entry) => entry.content.trim())
     .filter(Boolean)
-    .join("\n");
+    .join(RECORD_SECTION_SEPARATOR);
 }
 
 export default function ResumeDrill({
@@ -577,10 +577,9 @@ export default function ResumeDrill({
 
   const completeProject = async (history: ConversationEntry[]) => {
     if (!activeProject || !mainQuestionId) return;
-    const candidateAnswers = history
-      .filter((entry) => entry.role === "candidate")
-      .map((entry) => entry.content)
-      .join("\n---\n");
+    const interviewerQuestions =
+      formatConversationEntries(history, "interviewer") || originalQuestion;
+    const candidateAnswers = formatConversationEntries(history, "candidate");
 
     const evaluation =
       history.length > 2
@@ -605,7 +604,7 @@ export default function ResumeDrill({
     addEvaluationMessage(evaluation);
     await saveInterviewRecord(userId, {
       id: null,
-      question_content: `${projectContext(activeProject)}\n\n${originalQuestion}`,
+      question_content: interviewerQuestions,
       answer: candidateAnswers,
       score: evaluation.score,
       feedback: formatEvaluationContent(evaluation),

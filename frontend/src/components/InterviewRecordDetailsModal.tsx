@@ -19,12 +19,26 @@ interface InterviewRecordDetailsModalProps {
   getScoreColor: (score: number) => "success" | "primary" | "warning" | "danger";
 }
 
+const RECORD_SECTION_SEPARATOR = "\n---\n";
+
+function splitRecordSections(value: string): string[] {
+  return value
+    .split(RECORD_SECTION_SEPARATOR)
+    .map((section) => section.trim())
+    .filter(Boolean);
+}
+
 export default function InterviewRecordDetailsModal({
   open,
   onClose,
   record,
   getScoreColor,
 }: InterviewRecordDetailsModalProps) {
+  const questionSections = record ? splitRecordSections(record.question_content) : [];
+  const answerSections = record ? splitRecordSections(record.answer) : [];
+  const shouldRenderConversation = questionSections.length > 1 || answerSections.length > 1;
+  const conversationTurnCount = Math.max(questionSections.length, answerSections.length);
+
   return (
     <Modal open={open} onClose={onClose}>
       <ModalDialog sx={{ maxWidth: 800, width: "90vw" }}>
@@ -54,42 +68,95 @@ export default function InterviewRecordDetailsModal({
 
               <Divider />
 
-              <Box>
-                <Typography level="title-sm" sx={{ color: "primary.600", mb: 1 }}>
-                  Interview Question
-                </Typography>
-                <Card
-                  variant="soft"
-                  sx={{
-                    bgcolor: "primary.50",
-                    borderLeft: "4px solid",
-                    borderLeftColor: "primary.500",
-                  }}
-                >
-                  <CardContent>
-                    <Typography level="body-md">{record.question_content}</Typography>
-                  </CardContent>
-                </Card>
-              </Box>
-
-              <Box>
-                <Typography level="title-sm" sx={{ color: "primary.600", mb: 1 }}>
-                  My Answer
-                </Typography>
-                <Card
-                  variant="outlined"
-                  sx={{
-                    borderLeft: "4px solid",
-                    borderLeftColor: "neutral.400",
-                  }}
-                >
-                  <CardContent>
-                    <Typography level="body-md" sx={{ whiteSpace: "pre-wrap" }}>
-                      {record.answer}
+              {shouldRenderConversation ? (
+                <Box>
+                  <Typography level="title-sm" sx={{ color: "primary.600", mb: 1 }}>
+                    Interview Conversation
+                  </Typography>
+                  <Stack spacing={1.5}>
+                    {Array.from({ length: conversationTurnCount }, (_, index) => (
+                      <Stack key={index} spacing={1}>
+                        {questionSections[index] && (
+                          <Card
+                            variant="soft"
+                            sx={{
+                              bgcolor: "primary.50",
+                              borderLeft: "4px solid",
+                              borderLeftColor: "primary.500",
+                            }}
+                          >
+                            <CardContent>
+                              <Typography level="body-xs" sx={{ color: "primary.600", mb: 0.5 }}>
+                                Question {index + 1}
+                              </Typography>
+                              <Typography level="body-md" sx={{ whiteSpace: "pre-wrap" }}>
+                                {questionSections[index]}
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        )}
+                        {answerSections[index] && (
+                          <Card
+                            variant="outlined"
+                            sx={{
+                              borderLeft: "4px solid",
+                              borderLeftColor: "neutral.400",
+                            }}
+                          >
+                            <CardContent>
+                              <Typography level="body-xs" sx={{ color: "neutral.600", mb: 0.5 }}>
+                                Answer {index + 1}
+                              </Typography>
+                              <Typography level="body-md" sx={{ whiteSpace: "pre-wrap" }}>
+                                {answerSections[index]}
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </Stack>
+                    ))}
+                  </Stack>
+                </Box>
+              ) : (
+                <>
+                  <Box>
+                    <Typography level="title-sm" sx={{ color: "primary.600", mb: 1 }}>
+                      Interview Question
                     </Typography>
-                  </CardContent>
-                </Card>
-              </Box>
+                    <Card
+                      variant="soft"
+                      sx={{
+                        bgcolor: "primary.50",
+                        borderLeft: "4px solid",
+                        borderLeftColor: "primary.500",
+                      }}
+                    >
+                      <CardContent>
+                        <Typography level="body-md">{record.question_content}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Box>
+
+                  <Box>
+                    <Typography level="title-sm" sx={{ color: "primary.600", mb: 1 }}>
+                      My Answer
+                    </Typography>
+                    <Card
+                      variant="outlined"
+                      sx={{
+                        borderLeft: "4px solid",
+                        borderLeftColor: "neutral.400",
+                      }}
+                    >
+                      <CardContent>
+                        <Typography level="body-md" sx={{ whiteSpace: "pre-wrap" }}>
+                          {record.answer}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Box>
+                </>
+              )}
 
               <Box>
                 <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1 }}>

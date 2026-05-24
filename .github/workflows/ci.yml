@@ -43,3 +43,4 @@ jobs:
       - run: uv sync
       - run: uvx black --check .
       - run: uvx isort --check .
+      - run: uv run python -m unittest discover -s tests -p "test_*.py" -v

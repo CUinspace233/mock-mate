@@ -46,6 +46,40 @@ def _load_preset_position_ids() -> tuple[str, ...]:
 # Must match shared/interview_positions.json (frontend preset list, excluding __custom__)
 DEFAULT_POSITIONS: tuple[str, ...] = _load_preset_position_ids()
 
+# Minimum score required to persist a generated news-based question.
+RELEVANCE_THRESHOLD = 0.4
+
+POSITION_KEYWORDS: dict[str, list[str]] = {
+    "agent": ["agent", "llm", "tool", "autonomous", "workflow", "mcp", "openai", "prompt"],
+    "frontend": ["react", "vue", "angular", "javascript", "css", "html", "ui", "ux"],
+    "backend": ["api", "database", "server", "python", "java", "node", "sql"],
+    "fullstack": ["full stack", "frontend", "backend", "web development"],
+    "mobile": ["mobile", "ios", "android", "react native", "flutter", "app"],
+    "devops": ["docker", "kubernetes", "aws", "cloud", "deployment", "ci/cd"],
+    "ai": [
+        "ai",
+        "machine learning",
+        "llm",
+        "openai",
+        "model",
+        "neural",
+        "deep learning",
+        "gpt",
+    ],
+    "qa": ["test", "testing", "quality", "automation", "selenium", "cypress", "bug"],
+    "product": ["product", "roadmap", "stakeholder", "feature", "release", "user"],
+    "ui": ["design", "figma", "ux", "ui", "prototype", "accessibility"],
+    "data": ["data", "analytics", "sql", "warehouse", "etl", "bi", "dashboard"],
+}
+
+CATEGORY_POSITIONS: dict[NewsCategory, frozenset[str]] = {
+    NewsCategory.AI: frozenset({"ai", "agent", "backend", "fullstack", "data", "product", "qa"}),
+    NewsCategory.WEB_DEV: frozenset({"frontend", "backend", "fullstack", "ui", "qa", "product"}),
+    NewsCategory.MOBILE: frozenset({"mobile", "frontend", "ui", "qa", "product"}),
+    NewsCategory.DEVOPS: frozenset({"devops", "backend", "qa", "product"}),
+    NewsCategory.GENERAL_TECH: frozenset({"product", "qa", "data"}),
+}
+
 NEWS_SOURCES = {
     NewsCategory.AI: [
         {
@@ -306,53 +340,45 @@ async def generate_question_from_news(
         return None, "", 0.0
 
 
+def _count_keyword_hits(text: str, keywords: list[str]) -> int:
+    return sum(1 for keyword in keywords if keyword in text)
+
+
 def calculate_relevance_score(
     news_item: dict, question: str, category: NewsCategory, position: str
 ) -> float:
-    """Calculate relevance score based on various factors"""
-    score = 0.5  # Base score
+    """Calculate relevance score from 0.0 to 1.0 with no base floor.
 
-    # Check for position-related keywords
-    position_keywords = {
-        "frontend": ["react", "vue", "angular", "javascript", "css", "html", "ui", "ux"],
-        "backend": ["api", "database", "server", "python", "java", "node", "sql"],
-        "fullstack": ["full stack", "frontend", "backend", "web development"],
-        "mobile": ["mobile", "ios", "android", "react native", "flutter", "app"],
-        "devops": ["docker", "kubernetes", "aws", "cloud", "deployment", "ci/cd"],
-        "ai": [
-            "ai",
-            "machine learning",
-            "llm",
-            "openai",
-            "model",
-            "neural",
-            "deep learning",
-            "gpt",
-        ],
-        "qa": ["test", "testing", "quality", "automation", "selenium", "cypress", "bug"],
-        "product": ["product", "roadmap", "stakeholder", "feature", "release", "user"],
-        "ui": ["design", "figma", "ux", "ui", "prototype", "accessibility"],
-        "data": ["data", "analytics", "sql", "warehouse", "etl", "bi", "dashboard"],
-    }
+    Components (max 1.0):
+    - Category-position alignment: 0.15
+    - Position keywords in news title/summary: up to 0.35
+    - Position keywords in generated question: up to 0.35
+    - Recency: up to 0.15
+    """
+    if not question.strip():
+        return 0.0
 
-    keywords = position_keywords.get(position, [])
-    title_lower = news_item["title"].lower()
-    summary_lower = (news_item.get("summary", "")).lower()
+    keywords = POSITION_KEYWORDS.get(position, [])
+    news_text = f"{news_item['title']} {news_item.get('summary', '')}".lower()
+    question_lower = question.lower()
 
-    # Increase score for relevant keywords
-    for keyword in keywords:
-        if keyword in title_lower or keyword in summary_lower:
-            score += 0.1
+    score = 0.0
 
-    # Check recency (newer news gets higher score)
+    if position in CATEGORY_POSITIONS.get(category, frozenset()):
+        score += 0.15
+
+    score += min(0.35, _count_keyword_hits(news_text, keywords) * 0.1)
+    score += min(0.35, _count_keyword_hits(question_lower, keywords) * 0.1)
+
     news_date = news_item.get("published_at", datetime.now(UTC))
     days_old = (datetime.now(UTC) - news_date).days
     if days_old <= 1:
-        score += 0.2
+        score += 0.15
     elif days_old <= 3:
-        score += 0.1
+        score += 0.08
+    elif days_old <= 7:
+        score += 0.03
 
-    # Ensure score is between 0 and 1
     return min(1.0, max(0.0, score))
 
 
@@ -611,21 +637,30 @@ async def _generate_questions_for_news_items(
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     valid_results: list[GeneratedNewsQuestionResult] = []
-    for (index, _), result in zip(task_contexts, results):
+    for (index, position), result in zip(task_contexts, results):
         if isinstance(result, BaseException):
             logger.error(f"Failed to generate question for news index {index}: {result}")
             continue
 
         question_data, ai_reasoning, relevance_score = result
-        if question_data and relevance_score > 0.3:
-            valid_results.append(
-                GeneratedNewsQuestionResult(
-                    news_index=index,
-                    question_data=question_data,
-                    ai_reasoning=ai_reasoning,
-                    relevance_score=relevance_score,
-                )
+        if not question_data:
+            continue
+        if relevance_score < RELEVANCE_THRESHOLD:
+            logger.info(
+                "Skipping low-relevance question for %s (score=%.2f, threshold=%.2f)",
+                position,
+                relevance_score,
+                RELEVANCE_THRESHOLD,
             )
+            continue
+        valid_results.append(
+            GeneratedNewsQuestionResult(
+                news_index=index,
+                question_data=question_data,
+                ai_reasoning=ai_reasoning,
+                relevance_score=relevance_score,
+            )
+        )
 
     return valid_results
 

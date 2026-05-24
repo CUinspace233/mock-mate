@@ -55,9 +55,32 @@ interface WindowWithSpeech {
   webkitSpeechRecognition?: SpeechRecogConstructor;
 }
 
-const getWindow = () => typeof window !== "undefined" ? window as unknown as WindowWithSpeech : undefined;
+const getWindow = () =>
+  typeof window !== "undefined" ? (window as unknown as WindowWithSpeech) : undefined;
 
 const isSupported = !!getWindow()?.SpeechRecognition || !!getWindow()?.webkitSpeechRecognition;
+
+function isArcBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Arc/i.test(navigator.userAgent) || Boolean("arc" in navigator);
+}
+
+function speechRecognitionErrorMessage(error: string): string {
+  if (error === "network") {
+    return isArcBrowser()
+      ? "Speech recognition is unavailable in Arc right now. Try Chrome, or type your answer instead."
+      : "Speech recognition service is unavailable in this browser. Try Chrome, check your network, or type your answer instead.";
+  }
+
+  const errorMessages: Record<string, string> = {
+    "not-allowed": "Microphone access denied. Please allow microphone permission.",
+    "no-speech": "No speech detected. Please try again.",
+    "audio-capture": "No microphone found. Please check your audio device.",
+    aborted: "",
+  };
+
+  return errorMessages[error] ?? `Speech recognition error: ${error}`;
+}
 
 export function useSpeechRecognition({
   language,
@@ -134,14 +157,7 @@ export function useSpeechRecognition({
     };
 
     recognition.onerror = (event) => {
-      const errorMessages: Record<string, string> = {
-        "not-allowed": "Microphone access denied. Please allow microphone permission.",
-        "no-speech": "No speech detected. Please try again.",
-        "audio-capture": "No microphone found. Please check your audio device.",
-        network: "Network error. Speech recognition requires an internet connection.",
-        aborted: "",
-      };
-      const message = errorMessages[event.error] ?? `Speech recognition error: ${event.error}`;
+      const message = speechRecognitionErrorMessage(event.error);
       if (message) {
         onErrorRef.current(message);
       }

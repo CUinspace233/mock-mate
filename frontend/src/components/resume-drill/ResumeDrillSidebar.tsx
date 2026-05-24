@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Avatar,
   Box,
@@ -7,6 +8,9 @@ import {
   Chip,
   Divider,
   IconButton,
+  Modal,
+  ModalClose,
+  ModalDialog,
   Option,
   Select,
   Stack,
@@ -76,6 +80,13 @@ export default function ResumeDrillSidebar({
   onFollowUpsPerPointChange,
   onProjectSelect,
 }: ResumeDrillSidebarProps) {
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+
+  const handleConfirmDelete = () => {
+    setIsDeleteConfirmOpen(false);
+    onDeleteResume();
+  };
+
   return (
     <Box
       sx={{
@@ -156,7 +167,12 @@ export default function ResumeDrillSidebar({
                       <VisibilityIcon />
                     </IconButton>
                   </Tooltip>
-                  <IconButton size="sm" color="danger" variant="plain" onClick={onDeleteResume}>
+                  <IconButton
+                    size="sm"
+                    color="danger"
+                    variant="plain"
+                    onClick={() => setIsDeleteConfirmOpen(true)}
+                  >
                     <DeleteIcon />
                   </IconButton>
                 </Stack>
@@ -240,6 +256,42 @@ export default function ResumeDrillSidebar({
           ))}
         </Stack>
       </Stack>
+
+      <Modal
+        open={isDeleteConfirmOpen}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          p: 2,
+        }}
+      >
+        <ModalDialog variant="outlined" sx={{ maxWidth: 420, width: "90vw" }}>
+          <ModalClose />
+          <Box sx={{ p: 2 }}>
+            <Typography level="h4" sx={{ mb: 1, textAlign: "center" }}>
+              Delete Resume
+            </Typography>
+            <Typography level="body-md" sx={{ mb: 3, textAlign: "center", color: "neutral.600" }}>
+              This will remove the current resume and clear any active resume drill progress. Saved
+              interview history will not be deleted.
+            </Typography>
+            <Stack direction="row" spacing={2} justifyContent="center">
+              <Button
+                variant="outlined"
+                color="neutral"
+                onClick={() => setIsDeleteConfirmOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button color="danger" onClick={handleConfirmDelete}>
+                Delete Resume
+              </Button>
+            </Stack>
+          </Box>
+        </ModalDialog>
+      </Modal>
     </Box>
   );
 }

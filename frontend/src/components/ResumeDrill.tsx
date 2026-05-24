@@ -1,34 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Markdown from "react-markdown";
-import {
-  Alert,
-  Avatar,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  Divider,
-  IconButton,
-  Option,
-  Select,
-  Stack,
-  Textarea,
-  Tooltip,
-  Typography,
-} from "@mui/joy";
-import {
-  Delete as DeleteIcon,
-  Description as DescriptionIcon,
-  Gavel as GavelIcon,
-  Mic as MicIcon,
-  PlayArrow as PlayArrowIcon,
-  Replay as ReplayIcon,
-  Send as SendIcon,
-  Stop as StopIcon,
-  Cancel as CancelIcon,
-  UploadFile as UploadFileIcon,
-} from "@mui/icons-material";
+import { Box } from "@mui/joy";
+import ResumeDrillChatPanel from "./resume-drill/ResumeDrillChatPanel";
+import ResumeDrillSidebar from "./resume-drill/ResumeDrillSidebar";
+import ResumePreviewModal from "./resume-drill/ResumePreviewModal";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
 import {
   completeSession,
@@ -64,9 +38,6 @@ interface ResumeDrillProps {
   language: string;
   questionCreativity: CreativityLevel;
 }
-
-const DRILL_POINT_OPTIONS = [1, 2, 3, 5];
-const FOLLOW_UP_ROUND_OPTIONS = [1, 2, 3];
 
 type PersistedMessage = Omit<Message, "timestamp"> & { timestamp: string };
 
@@ -162,6 +133,7 @@ export default function ResumeDrill({
   const [isComplete, setIsComplete] = useState(false);
   const [error, setError] = useState("");
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+  const [isResumePreviewOpen, setIsResumePreviewOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { isRecording, isSupported, toggleRecording, stopRecording } = useSpeechRecognition({
     language,
@@ -353,6 +325,7 @@ export default function ResumeDrill({
         language,
       });
       setResume(response.resume);
+      setIsResumePreviewOpen(false);
       setSelectedProjectIndex(0);
       setActiveProjectIndex(0);
       setMessages([]);
@@ -380,6 +353,7 @@ export default function ResumeDrill({
     try {
       await deleteCurrentResume(userId);
       setResume(null);
+      setIsResumePreviewOpen(false);
       setMessages([]);
       setCurrentQuestion(null);
       setCurrentAnswer("");
@@ -792,439 +766,67 @@ export default function ResumeDrill({
         overflow: "hidden",
       }}
     >
-      <Box
-        sx={{
-          minWidth: 0,
-          borderRight: { md: "1px solid" },
-          borderColor: "neutral.200",
-          p: 2,
-          bgcolor: "#fbfbf7",
-          overflow: "auto",
-        }}
-      >
-        <Stack spacing={2}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Avatar size="sm" sx={{ bgcolor: "#111827", color: "#fff" }}>
-              <GavelIcon fontSize="small" />
-            </Avatar>
-            <Box>
-              <Typography level="title-md">Resume Drill</Typography>
-              <Typography level="body-xs" sx={{ color: "neutral.500" }}>
-                Project-by-project pressure test
-              </Typography>
-            </Box>
-          </Stack>
+      <ResumeDrillSidebar
+        resume={resume}
+        projects={projects}
+        isUploading={isUploading}
+        isStarted={isStarted}
+        canAdvanceProject={canAdvanceProject}
+        selectedProjectIndex={selectedProjectIndex}
+        activeProjectIndex={activeProjectIndex}
+        drillPointCount={drillPointCount}
+        followUpsPerPoint={followUpsPerPoint}
+        questionsPerProject={questionsPerProject}
+        isResumePreviewOpen={isResumePreviewOpen}
+        onUpload={(file) => void handleUpload(file)}
+        onDeleteResume={() => void handleDeleteResume()}
+        onPreviewResume={() => setIsResumePreviewOpen((open) => !open)}
+        onDrillPointCountChange={setDrillPointCount}
+        onFollowUpsPerPointChange={setFollowUpsPerPoint}
+        onProjectSelect={(projectIndex) => void handleProjectSelect(projectIndex)}
+      />
 
-          <Button
-            component="label"
-            variant="solid"
-            color="neutral"
-            startDecorator={<UploadFileIcon />}
-            loading={isUploading}
-          >
-            {resume ? "Replace Resume" : "Upload Resume"}
-            <input
-              hidden
-              type="file"
-              accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown"
-              onChange={(event) => {
-                const file = event.target.files?.[0] || null;
-                void handleUpload(file);
-                event.target.value = "";
-              }}
-            />
-          </Button>
+      <ResumeDrillChatPanel
+        resume={resume}
+        previewProject={previewProject}
+        selectedProject={selectedProject}
+        activeProject={activeProject}
+        activeProjectIndex={activeProjectIndex}
+        activePointNumber={activePointNumber}
+        drillPointCount={drillPointCount}
+        questionNumber={questionNumber}
+        questionsPerProject={questionsPerProject}
+        error={error}
+        hasPendingProjectSelection={hasPendingProjectSelection}
+        visibleMessages={visibleMessages}
+        isComplete={isComplete}
+        awaitingAnswer={awaitingAnswer}
+        currentQuestion={currentQuestion}
+        isRecording={isRecording}
+        currentAnswer={currentAnswer}
+        isSupported={isSupported}
+        isLoading={isLoading}
+        isUploading={isUploading}
+        isStarted={isStarted}
+        canAdvanceProject={canAdvanceProject}
+        advanceProjectLabel={advanceProjectLabel}
+        messagesEndRef={messagesEndRef}
+        onAnswerChange={setCurrentAnswer}
+        onSendAnswer={() => void handleSendAnswer()}
+        onCancelDrill={() => void cancelDrill()}
+        onToggleRecording={toggleRecording}
+        onStartSelectedProject={() => void startSelectedProject()}
+        onRestartCurrentProject={() => void restartCurrentProject()}
+        onContinueCurrentProject={() => void continueCurrentProject()}
+        onGoNextProject={() => void goNextProject()}
+        onStartDrill={() => void startDrill()}
+      />
 
-          {resume && (
-            <Card variant="outlined" sx={{ bgcolor: "background.surface", boxShadow: "xs" }}>
-              <CardContent>
-                <Stack direction="row" spacing={1} justifyContent="space-between">
-                  <Stack direction="row" spacing={1} sx={{ minWidth: 0 }}>
-                    <DescriptionIcon sx={{ color: "neutral.500" }} />
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography level="title-sm" noWrap>
-                        {resume.filename}
-                      </Typography>
-                      <Typography level="body-xs" sx={{ color: "neutral.500" }}>
-                        {resume.projects.length} projects parsed
-                      </Typography>
-                    </Box>
-                  </Stack>
-                  <IconButton
-                    size="sm"
-                    color="danger"
-                    variant="plain"
-                    onClick={() => void handleDeleteResume()}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </Stack>
-              </CardContent>
-            </Card>
-          )}
-
-          <Stack spacing={1}>
-            <Box>
-              <Typography level="body-sm" sx={{ fontWeight: 700 }}>
-                Drill points per project
-              </Typography>
-              <Typography level="body-xs" sx={{ color: "neutral.500", lineHeight: 1.45 }}>
-                Distinct project angles AI should cover.
-              </Typography>
-            </Box>
-            <Select
-              size="sm"
-              value={drillPointCount}
-              disabled={isStarted}
-              onChange={(_, value) => value && setDrillPointCount(value as number)}
-              sx={{ width: "100%" }}
-            >
-              {DRILL_POINT_OPTIONS.map((count) => (
-                <Option key={count} value={count}>
-                  {count} points
-                </Option>
-              ))}
-            </Select>
-          </Stack>
-
-          <Stack spacing={1}>
-            <Box>
-              <Typography level="body-sm" sx={{ fontWeight: 700 }}>
-                Follow-up rounds per point
-              </Typography>
-              <Typography level="body-xs" sx={{ color: "neutral.500", lineHeight: 1.45 }}>
-                Consecutive follow-ups before AI moves to another point.
-              </Typography>
-            </Box>
-            <Select
-              size="sm"
-              value={followUpsPerPoint}
-              disabled={isStarted}
-              onChange={(_, value) => value && setFollowUpsPerPoint(value as number)}
-              sx={{ width: "100%" }}
-            >
-              {FOLLOW_UP_ROUND_OPTIONS.map((count) => (
-                <Option key={count} value={count}>
-                  {count} {count === 1 ? "round" : "rounds"}
-                </Option>
-              ))}
-            </Select>
-            <Typography level="body-xs" sx={{ color: "neutral.500" }}>
-              {questionsPerProject} total questions per project.
-            </Typography>
-          </Stack>
-
-          <Divider />
-
-          <Stack spacing={1}>
-            {projects.map((project, index) => (
-              <Button
-                key={project.project_id}
-                variant={index === selectedProjectIndex ? "soft" : "plain"}
-                color={index === activeProjectIndex && isStarted ? "warning" : "neutral"}
-                disabled={isStarted && !canAdvanceProject}
-                onClick={() => void handleProjectSelect(index)}
-                sx={{ justifyContent: "flex-start", textAlign: "left", minHeight: 54 }}
-              >
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography level="body-sm" noWrap sx={{ fontWeight: 700 }}>
-                    {project.name}
-                  </Typography>
-                  <Typography level="body-xs" noWrap sx={{ color: "neutral.500" }}>
-                    {project.tech_stack.slice(0, 4).join(", ") || project.role || "Resume project"}
-                  </Typography>
-                </Box>
-              </Button>
-            ))}
-          </Stack>
-        </Stack>
-      </Box>
-
-      <Box
-        sx={{
-          display: "flex",
-          minHeight: 0,
-          minWidth: 0,
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "neutral.200" }}>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            justifyContent="space-between"
-            spacing={2}
-            alignItems={{ xs: "stretch", sm: "center" }}
-            sx={{ minWidth: 0 }}
-          >
-            <Box sx={{ minWidth: 0 }}>
-              <Typography level="title-md" noWrap>
-                {previewProject?.name || "No resume loaded"}
-              </Typography>
-              <Typography
-                level="body-sm"
-                sx={{
-                  color: "neutral.500",
-                  overflow: "hidden",
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                  overflowWrap: "anywhere",
-                }}
-              >
-                {previewProject?.summary || "Upload a PDF, TXT, or MD resume to begin."}
-              </Typography>
-            </Box>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
-              {isStarted && activeProject && (
-                <Chip color="warning" variant="soft" size="sm">
-                  Project {activeProjectIndex + 1}/{projects.length} · Point {activePointNumber}/
-                  {drillPointCount} · Q {questionNumber}/{questionsPerProject}
-                </Chip>
-              )}
-            </Stack>
-          </Stack>
-        </Box>
-
-        {error && (
-          <Alert color="danger" variant="soft" sx={{ m: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        <Box
-          sx={{
-            flex: 1,
-            minHeight: 0,
-            overflow: "auto",
-            p: 2,
-            display: "flex",
-            flexDirection: "column",
-            gap: 1.5,
-          }}
-        >
-          {!resume && (
-            <Box sx={{ py: 8, textAlign: "center", color: "neutral.500" }}>
-              <DescriptionIcon sx={{ fontSize: 48, mb: 1, color: "neutral.300" }} />
-              <Typography level="title-md">Upload your current resume</Typography>
-              <Typography level="body-sm">
-                The parsed project list will stay attached to your account.
-              </Typography>
-            </Box>
-          )}
-
-          {hasPendingProjectSelection && selectedProject && (
-            <Box sx={{ py: 8, textAlign: "center", color: "neutral.500" }}>
-              <GavelIcon sx={{ fontSize: 44, mb: 1, color: "neutral.300" }} />
-              <Typography level="title-md">{selectedProject.name}</Typography>
-              <Typography level="body-sm">
-                Start this project to clear the previous drill view and generate its first question.
-              </Typography>
-            </Box>
-          )}
-
-          {visibleMessages.map((message) => (
-            <Stack
-              key={message.id}
-              direction="row"
-              spacing={1.5}
-              justifyContent={message.sender === "user" ? "flex-end" : "flex-start"}
-              alignItems="flex-start"
-            >
-              {message.sender === "ai" && (
-                <Avatar size="sm" sx={{ bgcolor: "#111827", color: "#fff" }}>
-                  <GavelIcon fontSize="small" />
-                </Avatar>
-              )}
-              <Card
-                variant={message.sender === "user" ? "soft" : "outlined"}
-                sx={{
-                  maxWidth: { xs: "88%", md: "74%" },
-                  bgcolor: message.sender === "user" ? "warning.50" : "background.surface",
-                  borderColor: message.sender === "user" ? "warning.200" : "neutral.200",
-                }}
-              >
-                <CardContent sx={{ p: 1.5 }}>
-                  {message.id.startsWith("temp-") && !message.content ? (
-                    <Typography level="body-sm" sx={{ color: "neutral.500" }}>
-                      Drilling into the project...
-                    </Typography>
-                  ) : (
-                    <Typography
-                      level="body-md"
-                      component="div"
-                      sx={{ "& p": { m: 0 }, "& p + p": { mt: 1 } }}
-                    >
-                      <Markdown>{message.content}</Markdown>
-                    </Typography>
-                  )}
-                  {message.score !== undefined && (
-                    <Chip
-                      size="sm"
-                      color={
-                        message.score >= 80 ? "success" : message.score >= 65 ? "warning" : "danger"
-                      }
-                      sx={{ mt: 1 }}
-                    >
-                      {message.score}/100
-                    </Chip>
-                  )}
-                </CardContent>
-              </Card>
-            </Stack>
-          ))}
-          <div ref={messagesEndRef} />
-        </Box>
-
-        <Divider />
-        <Box sx={{ p: 2, bgcolor: "neutral.50", flexShrink: 0 }}>
-          {isComplete ? (
-            <Alert color="success" variant="soft">
-              Resume drill completed. Your project-level records were saved.
-            </Alert>
-          ) : awaitingAnswer && currentQuestion ? (
-            <Stack spacing={1}>
-              <Textarea
-                minRows={2}
-                maxRows={7}
-                placeholder={
-                  isRecording
-                    ? "Listening..."
-                    : "Answer with concrete implementation details, tradeoffs, numbers, and what you personally owned..."
-                }
-                value={currentAnswer}
-                onChange={(event) => setCurrentAnswer(event.target.value)}
-                sx={{
-                  ...(isRecording && {
-                    borderColor: "danger.500",
-                    "&:focus-within": { borderColor: "danger.500" },
-                  }),
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-                    void handleSendAnswer();
-                  }
-                }}
-              />
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                justifyContent="space-between"
-                alignItems={{ xs: "stretch", sm: "center" }}
-                spacing={1}
-              >
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  alignItems="center"
-                  justifyContent={{ xs: "space-between", sm: "flex-start" }}
-                >
-                  <Button
-                    size="sm"
-                    variant="outlined"
-                    color="danger"
-                    startDecorator={<CancelIcon />}
-                    onClick={() => void cancelDrill()}
-                  >
-                    Cancel Drill
-                  </Button>
-                  <Typography level="body-xs" sx={{ color: "neutral.500" }}>
-                    Ctrl/Cmd+Enter to send
-                  </Typography>
-                </Stack>
-                <Stack direction="row" spacing={1}>
-                  {isSupported && (
-                    <Tooltip title={isRecording ? "Stop recording" : "Start voice input"}>
-                      <IconButton
-                        variant={isRecording ? "solid" : "outlined"}
-                        color={isRecording ? "danger" : "neutral"}
-                        size="sm"
-                        onClick={toggleRecording}
-                        disabled={isLoading}
-                      >
-                        {isRecording ? <StopIcon /> : <MicIcon />}
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                  <Button
-                    startDecorator={<SendIcon />}
-                    disabled={!currentAnswer.trim() || isLoading}
-                    loading={isLoading}
-                    onClick={() => void handleSendAnswer()}
-                  >
-                    Send
-                  </Button>
-                </Stack>
-              </Stack>
-            </Stack>
-          ) : canAdvanceProject ? (
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={1}
-              justifyContent="center"
-              alignItems="center"
-            >
-              {hasPendingProjectSelection ? (
-                <Button
-                  color="warning"
-                  variant="soft"
-                  startDecorator={<PlayArrowIcon />}
-                  onClick={() => void startSelectedProject()}
-                >
-                  Start Selected Project
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    color="neutral"
-                    variant="outlined"
-                    startDecorator={<ReplayIcon />}
-                    onClick={() => void restartCurrentProject()}
-                  >
-                    Restart Project
-                  </Button>
-                  <Button
-                    color="primary"
-                    variant="soft"
-                    onClick={() => void continueCurrentProject()}
-                  >
-                    Ask Another Angle
-                  </Button>
-                  <Button color="warning" variant="soft" onClick={() => void goNextProject()}>
-                    {advanceProjectLabel}
-                  </Button>
-                </>
-              )}
-            </Stack>
-          ) : !isStarted ? (
-            <Stack direction="row" justifyContent="center">
-              <Button
-                startDecorator={<PlayArrowIcon />}
-                disabled={!resume || isLoading || isUploading}
-                onClick={() => void startDrill()}
-              >
-                Start Drill
-              </Button>
-            </Stack>
-          ) : isStarted && !isLoading ? (
-            <Stack direction="row" justifyContent="center">
-              <Button
-                variant="outlined"
-                color="danger"
-                startDecorator={<CancelIcon />}
-                onClick={() => void cancelDrill()}
-              >
-                Cancel Drill
-              </Button>
-            </Stack>
-          ) : (
-            <Typography level="body-sm" sx={{ color: "neutral.500", textAlign: "center" }}>
-              {isLoading
-                ? "Generating the next drill question..."
-                : "Select a project and start the drill."}
-            </Typography>
-          )}
-        </Box>
-      </Box>
+      <ResumePreviewModal
+        open={isResumePreviewOpen}
+        resume={resume}
+        onClose={() => setIsResumePreviewOpen(false)}
+      />
     </Box>
   );
 }

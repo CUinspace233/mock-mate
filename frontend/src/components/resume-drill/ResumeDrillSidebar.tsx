@@ -81,10 +81,11 @@ export default function ResumeDrillSidebar({
       sx={{
         minWidth: 0,
         borderRight: { md: "1px solid" },
+        borderBottom: { xs: "1px solid", md: "none" },
         borderColor: "neutral.200",
         p: 2,
         bgcolor: "#fbfbf7",
-        overflow: "auto",
+        overflow: { xs: "visible", md: "auto" },
       }}
     >
       <Stack spacing={2}>

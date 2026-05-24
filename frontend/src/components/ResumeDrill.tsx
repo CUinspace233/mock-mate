@@ -757,12 +757,12 @@ export default function ResumeDrill({
       sx={{
         width: "100%",
         minWidth: 0,
-        height: { xs: "calc(100dvh - 210px)", md: "calc(100dvh - 245px)" },
+        height: { xs: "auto", md: "calc(100dvh - 245px)" },
         minHeight: 0,
         display: "grid",
         gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(260px, 320px) minmax(0, 1fr)" },
-        gridTemplateRows: { xs: "auto minmax(0, 1fr)", md: "minmax(0, 1fr)" },
-        overflow: "hidden",
+        gridTemplateRows: { xs: "auto auto", md: "minmax(0, 1fr)" },
+        overflow: { xs: "visible", md: "hidden" },
       }}
     >
       <ResumeDrillSidebar

@@ -102,7 +102,8 @@ export default function ResumeDrillChatPanel({
     <Box
       sx={{
         display: "flex",
-        minHeight: 0,
+        height: { xs: "min(720px, calc(100dvh - 96px))", md: "auto" },
+        minHeight: { xs: 520, md: 0 },
         minWidth: 0,
         flexDirection: "column",
         overflow: "hidden",

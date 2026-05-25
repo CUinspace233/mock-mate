@@ -57,6 +57,7 @@ type ResumeDrillDraft = {
   drillPointCount: number;
   followUpsPerPoint: number;
   questionsPerProject?: number;
+  currentRoundQuestionLimit?: number;
   topicDepth: number;
 };
 
@@ -125,6 +126,7 @@ export default function ResumeDrill({
   const [originalQuestion, setOriginalQuestion] = useState("");
   const [mainQuestionId, setMainQuestionId] = useState<string | null>(null);
   const [questionNumber, setQuestionNumber] = useState(0);
+  const [currentRoundQuestionLimit, setCurrentRoundQuestionLimit] = useState(0);
   const [topicDepth, setTopicDepth] = useState(0);
   const [awaitingAnswer, setAwaitingAnswer] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -147,6 +149,7 @@ export default function ResumeDrill({
   const selectedProject = projects[selectedProjectIndex] || null;
   const questionsPerPoint = followUpsPerPoint + 1;
   const questionsPerProject = drillPointCount * questionsPerPoint;
+  const activeQuestionLimit = currentRoundQuestionLimit || questionsPerProject;
   const activePointNumber =
     questionNumber > 0
       ? Math.min(drillPointCount, Math.ceil(questionNumber / questionsPerPoint))
@@ -154,7 +157,7 @@ export default function ResumeDrill({
   const canAdvanceProject =
     isStarted &&
     !!activeProject &&
-    questionNumber >= questionsPerProject &&
+    questionNumber >= activeQuestionLimit &&
     !awaitingAnswer &&
     !isLoading;
   const hasPendingProjectSelection =
@@ -229,6 +232,7 @@ export default function ResumeDrill({
         setOriginalQuestion(draft.originalQuestion);
         setMainQuestionId(draft.mainQuestionId);
         setQuestionNumber(draft.questionNumber);
+        setCurrentRoundQuestionLimit(draft.currentRoundQuestionLimit ?? questionsPerProject);
         setTopicDepth(draft.topicDepth ?? 0);
         setAwaitingAnswer(draft.awaitingAnswer);
         setIsStarted(draft.isStarted);
@@ -241,7 +245,7 @@ export default function ResumeDrill({
         localStorage.removeItem(draftKey(userId));
       }
     })();
-  }, [hasRestoredDraft, resume, userId]);
+  }, [hasRestoredDraft, questionsPerProject, resume, userId]);
 
   useEffect(() => {
     if (!userId || !resume) return;
@@ -266,11 +270,13 @@ export default function ResumeDrill({
       activeProjectIndex,
       drillPointCount,
       followUpsPerPoint,
+      currentRoundQuestionLimit: activeQuestionLimit,
       topicDepth,
     };
     localStorage.setItem(draftKey(userId), JSON.stringify(draft));
   }, [
     activeProjectIndex,
+    activeQuestionLimit,
     awaitingAnswer,
     conversationHistory,
     currentAnswer,
@@ -335,6 +341,7 @@ export default function ResumeDrill({
       setOriginalQuestion("");
       setMainQuestionId(null);
       setQuestionNumber(0);
+      setCurrentRoundQuestionLimit(questionsPerProject);
       setTopicDepth(0);
       setAwaitingAnswer(false);
       setIsStarted(false);
@@ -361,6 +368,7 @@ export default function ResumeDrill({
       setOriginalQuestion("");
       setMainQuestionId(null);
       setQuestionNumber(0);
+      setCurrentRoundQuestionLimit(questionsPerProject);
       setTopicDepth(0);
       setAwaitingAnswer(false);
       setIsStarted(false);
@@ -380,10 +388,13 @@ export default function ResumeDrill({
       sessionIdOverride?: string,
       topicDepthOverride?: number,
       forceNewTopic = false,
+      questionLimitOverride?: number,
+      promptHistory?: ConversationEntry[],
     ) => {
       if (!resume) return;
       const project = resume.projects[projectIndex];
       if (!project) return;
+      const questionLimit = questionLimitOverride ?? activeQuestionLimit;
       const pointNumber = Math.max(
         1,
         Math.min(drillPointCount, Math.ceil(nextQuestionNumber / questionsPerPoint)),
@@ -409,15 +420,16 @@ export default function ResumeDrill({
         );
       };
 
+      const historyForPrompt = promptHistory ?? history;
       const final =
-        nextQuestionNumber === 1
+        nextQuestionNumber === 1 && !promptHistory?.length
           ? await generateResumeQuestionStream(
               {
                 resume_id: resume.id,
                 project,
                 resume_summary: resumeSummary,
                 question_number: nextQuestionNumber,
-                questions_per_project: questionsPerProject,
+                questions_per_project: questionLimit,
                 point_count: drillPointCount,
                 followups_per_point: followUpsPerPoint,
                 point_number: pointNumber,
@@ -438,7 +450,7 @@ export default function ResumeDrill({
                 project,
                 resume_summary: resumeSummary,
                 question_number: nextQuestionNumber,
-                questions_per_project: questionsPerProject,
+                questions_per_project: questionLimit,
                 point_count: drillPointCount,
                 followups_per_point: followUpsPerPoint,
                 point_number: pointNumber,
@@ -451,7 +463,7 @@ export default function ResumeDrill({
                 creativity: questionCreativity,
                 session_id: sessionIdOverride || sessionId || undefined,
                 original_question: originalQuestion,
-                conversation_history: history,
+                conversation_history: historyForPrompt,
                 topic_depth: topicDepthOverride ?? topicDepth,
                 force_new_topic: forceNewTopic,
               },
@@ -497,10 +509,10 @@ export default function ResumeDrill({
       openaiApiKey,
       openaiModel,
       originalQuestion,
+      activeQuestionLimit,
       drillPointCount,
       followUpsPerPoint,
       questionsPerPoint,
-      questionsPerProject,
       questionCreativity,
       resume,
       resumeSummary,
@@ -531,6 +543,7 @@ export default function ResumeDrill({
     setOriginalQuestion("");
     setMainQuestionId(null);
     setQuestionNumber(0);
+    setCurrentRoundQuestionLimit(questionsPerProject);
     setTopicDepth(0);
     try {
       const session = await startInterviewSession({
@@ -539,7 +552,15 @@ export default function ResumeDrill({
         session_type: SessionType.RESUME_DRILL,
       });
       setSessionId(session.session_id);
-      await streamQuestion(startIndex, 1, [], session.session_id);
+      await streamQuestion(
+        startIndex,
+        1,
+        [],
+        session.session_id,
+        undefined,
+        false,
+        questionsPerProject,
+      );
     } catch (err: unknown) {
       setIsStarted(false);
       setError(err instanceof Error ? err.message : "Failed to start resume drill.");
@@ -555,6 +576,7 @@ export default function ResumeDrill({
     setOriginalQuestion("");
     setMainQuestionId(null);
     setQuestionNumber(0);
+    setCurrentRoundQuestionLimit(questionsPerProject);
     setTopicDepth(0);
     setAwaitingAnswer(false);
     setIsLoading(false);
@@ -643,7 +665,7 @@ export default function ResumeDrill({
         { role: "candidate" as const, content: answerText },
       ];
       setConversationHistory(updatedHistory);
-      if (questionNumber < questionsPerProject) {
+      if (questionNumber < activeQuestionLimit) {
         const nextQuestionNumber = questionNumber + 1;
         const startsNewPoint = (nextQuestionNumber - 1) % questionsPerPoint === 0;
         const nextTopicDepth = startsNewPoint ? 0 : topicDepth + 1;
@@ -654,6 +676,7 @@ export default function ResumeDrill({
           undefined,
           nextTopicDepth,
           startsNewPoint,
+          activeQuestionLimit,
         );
       } else {
         await completeProject(updatedHistory);
@@ -676,11 +699,20 @@ export default function ResumeDrill({
     setOriginalQuestion("");
     setMainQuestionId(null);
     setQuestionNumber(0);
+    setCurrentRoundQuestionLimit(questionsPerProject);
     setTopicDepth(0);
     setAwaitingAnswer(false);
     setIsStarted(true);
     setIsComplete(false);
-    await streamQuestion(projectIndex, 1, [], sessionIdOverride);
+    await streamQuestion(
+      projectIndex,
+      1,
+      [],
+      sessionIdOverride,
+      undefined,
+      false,
+      questionsPerProject,
+    );
   };
 
   const goNextProject = async () => {
@@ -714,19 +746,27 @@ export default function ResumeDrill({
   const continueCurrentProject = async () => {
     if (!resume || !activeProject || !isStarted) return;
     stopRecording();
+    const previousHistory = conversationHistory;
     setError("");
     setCurrentQuestion(null);
     setCurrentAnswer("");
+    setConversationHistory([]);
+    setOriginalQuestion("");
+    setMainQuestionId(null);
+    setQuestionNumber(0);
+    setCurrentRoundQuestionLimit(questionsPerPoint);
     setAwaitingAnswer(false);
 
     try {
       await streamQuestion(
         activeProjectIndex,
-        questionNumber + 1,
-        conversationHistory,
+        1,
+        [],
         undefined,
         0,
         true,
+        questionsPerPoint,
+        previousHistory,
       );
     } catch (err: unknown) {
       setIsLoading(false);
@@ -794,7 +834,7 @@ export default function ResumeDrill({
         activePointNumber={activePointNumber}
         drillPointCount={drillPointCount}
         questionNumber={questionNumber}
-        questionsPerProject={questionsPerProject}
+        questionsPerProject={activeQuestionLimit}
         error={error}
         hasPendingProjectSelection={hasPendingProjectSelection}
         visibleMessages={visibleMessages}

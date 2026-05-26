@@ -6,7 +6,11 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/chat" element={<Home />} />
+        <Route path="/resume-drill" element={<Home />} />
+        <Route path="/history" element={<Home />} />
+        <Route path="/progress" element={<Home />} />
+        <Route path="*" element={<Navigate to="/chat" replace />} />
       </Routes>
     </Router>
   );

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
   Card,
@@ -63,7 +64,16 @@ interface InterviewTrainingProps {
   onLogout: () => void;
 }
 
+const TAB_ROUTES = ["/chat", "/resume-drill", "/history", "/progress"] as const;
+
+function tabFromPath(pathname: string): number {
+  const tabIndex = TAB_ROUTES.findIndex((path) => path === pathname);
+  return tabIndex >= 0 ? tabIndex : 0;
+}
+
 export default function InterviewTraining({ username, onLogout }: InterviewTrainingProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
   // zustand hooks
   const user_id = useAuthStore((state) => state.user_id);
   const dailyQuestionCount = useAuthStore((state) => state.dailyQuestionCount);
@@ -108,7 +118,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
 
   const [customPositionMode, setCustomPositionMode] = useState(false);
   const [customPositionInput, setCustomPositionInput] = useState("");
-  const [activeTab, setActiveTab] = useState<number>(0);
+  const [activeTab, setActiveTab] = useState<number>(() => tabFromPath(location.pathname));
   const isResumeDrillTab = activeTab === 1;
   const [interviewStarted, setInterviewStarted] = useState<boolean>(false);
   const [isRecoveredSession, setIsRecoveredSession] = useState(false);
@@ -128,6 +138,21 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   );
 
   const [pendingNewsQuestion, setPendingNewsQuestion] = useState<NewsQuestion | null>(null);
+
+  useEffect(() => {
+    if (location.pathname === "/") {
+      navigate("/chat", { replace: true });
+      return;
+    }
+    setActiveTab(tabFromPath(location.pathname));
+  }, [location.pathname, navigate]);
+
+  const handleTabChange = (_: unknown, value: string | number | null) => {
+    if (typeof value !== "number") return;
+    setActiveTab(value);
+    navigate(TAB_ROUTES[value] ?? "/chat");
+  };
+
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
     if (dailyQuestionDate !== today) {
@@ -760,7 +785,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
         </Box>
 
         {/* Main Content Tabs */}
-        <Tabs value={activeTab} onChange={(_, value) => setActiveTab(value as number)}>
+        <Tabs value={activeTab} onChange={handleTabChange}>
           <TabList
             sx={{
               bgcolor: "neutral.100",
@@ -849,6 +874,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
 
             <TabPanel value={1} keepMounted sx={{ p: 0 }}>
               <ResumeDrill
+                isActive={isResumeDrillTab}
                 userId={user_id || 0}
                 selectedPosition={selectedPosition}
                 selectedDifficulty={selectedDifficulty}

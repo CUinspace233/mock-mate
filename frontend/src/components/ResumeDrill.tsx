@@ -29,6 +29,7 @@ import {
 } from "../types/interview";
 
 interface ResumeDrillProps {
+  isActive: boolean;
   userId: number;
   selectedPosition: string;
   selectedDifficulty: Difficulty;
@@ -105,6 +106,7 @@ function formatConversationEntries(
 }
 
 export default function ResumeDrill({
+  isActive,
   userId,
   selectedPosition,
   selectedDifficulty,
@@ -190,6 +192,24 @@ export default function ResumeDrill({
 
     scrollToBottom("smooth");
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    if (!isActive) return;
+    shouldJumpToBottomRef.current = true;
+
+    const scrollContainer = messagesScrollRef.current;
+    if (!scrollContainer) return;
+
+    const scrollToBottom = () => {
+      scrollContainer.scrollTo({
+        top: scrollContainer.scrollHeight,
+        behavior: "auto",
+      });
+    };
+
+    scrollToBottom();
+    requestAnimationFrame(scrollToBottom);
+  }, [isActive]);
 
   useEffect(() => {
     if (!awaitingAnswer) stopRecording();

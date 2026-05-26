@@ -120,11 +120,12 @@ Set `NEWS_RETENTION_DAYS` in `.env` to change the default. The cleanup deletes e
 
 ## Architecture
 
-See [`PROJECT_INDEX.md`](./PROJECT_INDEX.md) for a navigable codebase index (API routes, components, data flows). See [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) for the full system design, including:
+See [`SYSTEM_ARCHITECTURE.md`](./SYSTEM_ARCHITECTURE.md) for the full system design, including:
+- Directory layout and tech stack
+- API endpoint reference (users, questions, answers, sessions, trending, resume)
 - Streaming generation architecture (background thread + async flush task + SSE)
-- Session recovery flow
-- Follow-up conversation system
+- Session recovery and follow-up conversation flows
 - Resume drill upload, parsing, and project-question flow
-- News processing pipeline
+- News processing pipeline and scheduled cleanup
 
 For interactive documentation, visit this repo's [DeepWiki](https://deepwiki.com/CUinspace233/mock-mate).

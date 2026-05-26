@@ -97,12 +97,16 @@ export default function ResumeDrillSidebar({
     <Box
       sx={{
         minWidth: 0,
-        borderRight: { md: "1px solid" },
+        borderRight: { md: "1px solid #e5e7eb" },
         borderBottom: { xs: "1px solid", md: "none" },
         borderColor: "neutral.200",
         p: { xs: 2, md: isCollapsed ? 1 : 2 },
         bgcolor: "#fbfbf7",
-        overflow: { xs: "visible", md: "auto" },
+        overflow: { xs: "visible", md: isCollapsed ? "hidden" : "auto" },
+        scrollbarWidth: isCollapsed ? "none" : "auto",
+        "&::-webkit-scrollbar": {
+          display: isCollapsed ? "none" : undefined,
+        },
       }}
     >
       {isCollapsed ? (

@@ -137,7 +137,8 @@ export default function ResumeDrill({
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
   const [isResumePreviewOpen, setIsResumePreviewOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
+  const shouldJumpToBottomRef = useRef(true);
   const { isRecording, isSupported, toggleRecording, stopRecording } = useSpeechRecognition({
     language,
     onTranscript: (text) => setCurrentAnswer(text),
@@ -170,7 +171,24 @@ export default function ResumeDrill({
   const resumeSummary = useMemo(() => resume?.content_text.slice(0, 1600) || "", [resume]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollContainer = messagesScrollRef.current;
+    if (!scrollContainer) return;
+
+    const scrollToBottom = (behavior: ScrollBehavior) => {
+      scrollContainer.scrollTo({
+        top: scrollContainer.scrollHeight,
+        behavior,
+      });
+    };
+
+    if (shouldJumpToBottomRef.current) {
+      shouldJumpToBottomRef.current = false;
+      scrollToBottom("auto");
+      requestAnimationFrame(() => scrollToBottom("auto"));
+      return;
+    }
+
+    scrollToBottom("smooth");
   }, [messages, isLoading]);
 
   useEffect(() => {
@@ -223,6 +241,7 @@ export default function ResumeDrill({
             }));
         }
 
+        shouldJumpToBottomRef.current = true;
         setSessionId(draft.sessionId);
         setMessages(restoredMessages);
         setCurrentQuestion(
@@ -855,7 +874,7 @@ export default function ResumeDrill({
         isStarted={isStarted}
         canAdvanceProject={canAdvanceProject}
         advanceProjectLabel={advanceProjectLabel}
-        messagesEndRef={messagesEndRef}
+        messagesScrollRef={messagesScrollRef}
         onAnswerChange={setCurrentAnswer}
         onSendAnswer={() => void handleSendAnswer()}
         onCancelDrill={() => void cancelDrill()}

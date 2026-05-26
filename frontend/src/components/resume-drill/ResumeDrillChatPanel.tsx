@@ -51,7 +51,7 @@ interface ResumeDrillChatPanelProps {
   isStarted: boolean;
   canAdvanceProject: boolean;
   advanceProjectLabel: string;
-  messagesEndRef: RefObject<HTMLDivElement | null>;
+  messagesScrollRef: RefObject<HTMLDivElement | null>;
   onAnswerChange: (answer: string) => void;
   onSendAnswer: () => void;
   onCancelDrill: () => void;
@@ -87,7 +87,7 @@ export default function ResumeDrillChatPanel({
   isStarted,
   canAdvanceProject,
   advanceProjectLabel,
-  messagesEndRef,
+  messagesScrollRef,
   onAnswerChange,
   onSendAnswer,
   onCancelDrill,
@@ -153,6 +153,7 @@ export default function ResumeDrillChatPanel({
       )}
 
       <Box
+        ref={messagesScrollRef}
         sx={{
           flex: 1,
           minHeight: 0,
@@ -233,7 +234,6 @@ export default function ResumeDrillChatPanel({
             </Card>
           </Stack>
         ))}
-        <div ref={messagesEndRef} />
       </Box>
 
       <Divider />

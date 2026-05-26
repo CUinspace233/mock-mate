@@ -136,6 +136,7 @@ export default function ResumeDrill({
   const [error, setError] = useState("");
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
   const [isResumePreviewOpen, setIsResumePreviewOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { isRecording, isSupported, toggleRecording, stopRecording } = useSpeechRecognition({
     language,
@@ -800,7 +801,10 @@ export default function ResumeDrill({
         height: { xs: "auto", md: "calc(100dvh - 245px)" },
         minHeight: 0,
         display: "grid",
-        gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(260px, 320px) minmax(0, 1fr)" },
+        gridTemplateColumns: {
+          xs: "minmax(0, 1fr)",
+          md: isSidebarCollapsed ? "64px minmax(0, 1fr)" : "minmax(260px, 320px) minmax(0, 1fr)",
+        },
         gridTemplateRows: { xs: "auto auto", md: "minmax(0, 1fr)" },
         overflow: { xs: "visible", md: "hidden" },
       }}
@@ -817,9 +821,11 @@ export default function ResumeDrill({
         followUpsPerPoint={followUpsPerPoint}
         questionsPerProject={questionsPerProject}
         isResumePreviewOpen={isResumePreviewOpen}
+        isCollapsed={isSidebarCollapsed}
         onUpload={(file) => void handleUpload(file)}
         onDeleteResume={() => void handleDeleteResume()}
         onPreviewResume={() => setIsResumePreviewOpen((open) => !open)}
+        onToggleCollapse={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
         onDrillPointCountChange={setDrillPointCount}
         onFollowUpsPerPointChange={setFollowUpsPerPoint}
         onProjectSelect={(projectIndex) => void handleProjectSelect(projectIndex)}

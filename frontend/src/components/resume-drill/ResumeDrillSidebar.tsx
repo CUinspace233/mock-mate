@@ -18,6 +18,8 @@ import {
   Typography,
 } from "@mui/joy";
 import {
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
   Delete as DeleteIcon,
   Description as DescriptionIcon,
   Gavel as GavelIcon,
@@ -53,9 +55,11 @@ interface ResumeDrillSidebarProps {
   followUpsPerPoint: number;
   questionsPerProject: number;
   isResumePreviewOpen: boolean;
+  isCollapsed: boolean;
   onUpload: (file: File | null) => void;
   onDeleteResume: () => void;
   onPreviewResume: () => void;
+  onToggleCollapse: () => void;
   onDrillPointCountChange: (count: number) => void;
   onFollowUpsPerPointChange: (count: number) => void;
   onProjectSelect: (projectIndex: number) => void;
@@ -73,9 +77,11 @@ export default function ResumeDrillSidebar({
   followUpsPerPoint,
   questionsPerProject,
   isResumePreviewOpen,
+  isCollapsed,
   onUpload,
   onDeleteResume,
   onPreviewResume,
+  onToggleCollapse,
   onDrillPointCountChange,
   onFollowUpsPerPointChange,
   onProjectSelect,
@@ -94,22 +100,70 @@ export default function ResumeDrillSidebar({
         borderRight: { md: "1px solid" },
         borderBottom: { xs: "1px solid", md: "none" },
         borderColor: "neutral.200",
-        p: 2,
+        p: { xs: 2, md: isCollapsed ? 1 : 2 },
         bgcolor: "#fbfbf7",
         overflow: { xs: "visible", md: "auto" },
       }}
     >
-      <Stack spacing={2}>
-        <Stack direction="row" spacing={1} alignItems="center">
+      {isCollapsed ? (
+        <Stack
+          spacing={1}
+          alignItems="center"
+          sx={{
+            display: { xs: "none", md: "flex" },
+            height: "100%",
+          }}
+        >
+          <Tooltip title="Expand resume sidebar" placement="right">
+            <IconButton size="sm" variant="soft" color="neutral" onClick={onToggleCollapse}>
+              <ChevronRightIcon />
+            </IconButton>
+          </Tooltip>
           <Avatar size="sm" sx={{ bgcolor: "#111827", color: "#fff" }}>
             <GavelIcon fontSize="small" />
           </Avatar>
-          <Box>
+          {resume && (
+            <Tooltip title="Preview parsed JSON" placement="right">
+              <IconButton
+                size="sm"
+                color="neutral"
+                variant={isResumePreviewOpen ? "soft" : "plain"}
+                onClick={onPreviewResume}
+              >
+                <VisibilityIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Stack>
+      ) : null}
+
+      <Stack spacing={2}>
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="center"
+          sx={{ display: { xs: "flex", md: isCollapsed ? "none" : "flex" } }}
+        >
+          <Avatar size="sm" sx={{ bgcolor: "#111827", color: "#fff" }}>
+            <GavelIcon fontSize="small" />
+          </Avatar>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography level="title-md">Resume Drill</Typography>
             <Typography level="body-xs" sx={{ color: "neutral.500" }}>
               Project-by-project pressure test
             </Typography>
           </Box>
+          <Tooltip title="Collapse resume sidebar">
+            <IconButton
+              size="sm"
+              variant="plain"
+              color="neutral"
+              onClick={onToggleCollapse}
+              sx={{ display: { xs: "none", md: "inline-flex" } }}
+            >
+              <ChevronLeftIcon />
+            </IconButton>
+          </Tooltip>
         </Stack>
 
         <Button
@@ -118,6 +172,7 @@ export default function ResumeDrillSidebar({
           color="neutral"
           startDecorator={<UploadFileIcon />}
           loading={isUploading}
+          sx={{ display: { xs: "inline-flex", md: isCollapsed ? "none" : "inline-flex" } }}
         >
           {resume ? "Replace Resume" : "Upload Resume"}
           <input
@@ -133,7 +188,14 @@ export default function ResumeDrillSidebar({
         </Button>
 
         {resume && (
-          <Card variant="outlined" sx={{ bgcolor: "background.surface", boxShadow: "xs" }}>
+          <Card
+            variant="outlined"
+            sx={{
+              bgcolor: "background.surface",
+              boxShadow: "xs",
+              display: { xs: "block", md: isCollapsed ? "none" : "block" },
+            }}
+          >
             <CardContent>
               <Stack direction="row" spacing={1} justifyContent="space-between">
                 <Stack direction="row" spacing={1} sx={{ minWidth: 0 }}>
@@ -181,7 +243,7 @@ export default function ResumeDrillSidebar({
           </Card>
         )}
 
-        <Stack spacing={1}>
+        <Stack spacing={1} sx={{ display: { xs: "flex", md: isCollapsed ? "none" : "flex" } }}>
           <Box>
             <Typography level="body-sm" sx={{ fontWeight: 700 }}>
               Drill points per project
@@ -205,7 +267,7 @@ export default function ResumeDrillSidebar({
           </Select>
         </Stack>
 
-        <Stack spacing={1}>
+        <Stack spacing={1} sx={{ display: { xs: "flex", md: isCollapsed ? "none" : "flex" } }}>
           <Box>
             <Typography level="body-sm" sx={{ fontWeight: 700 }}>
               Follow-up rounds per point
@@ -232,9 +294,9 @@ export default function ResumeDrillSidebar({
           </Typography>
         </Stack>
 
-        <Divider />
+        <Divider sx={{ display: { xs: "block", md: isCollapsed ? "none" : "block" } }} />
 
-        <Stack spacing={1}>
+        <Stack spacing={1} sx={{ display: { xs: "flex", md: isCollapsed ? "none" : "flex" } }}>
           {projects.map((project, index) => (
             <Button
               key={project.project_id}

@@ -11,6 +11,8 @@ import {
   CardContent,
 } from "@mui/joy";
 import { type InterviewRecord, PositionLabels, type PositionKey } from "../types/interview";
+import { formatLocalDateTime } from "../utils/dateTime";
+import { parseInterviewRecordDisplay } from "../utils/interviewRecordDisplay";
 
 interface InterviewRecordDetailsModalProps {
   open: boolean;
@@ -19,23 +21,15 @@ interface InterviewRecordDetailsModalProps {
   getScoreColor: (score: number) => "success" | "primary" | "warning" | "danger";
 }
 
-const RECORD_SECTION_SEPARATOR = "\n---\n";
-
-function splitRecordSections(value: string): string[] {
-  return value
-    .split(RECORD_SECTION_SEPARATOR)
-    .map((section) => section.trim())
-    .filter(Boolean);
-}
-
 export default function InterviewRecordDetailsModal({
   open,
   onClose,
   record,
   getScoreColor,
 }: InterviewRecordDetailsModalProps) {
-  const questionSections = record ? splitRecordSections(record.question_content) : [];
-  const answerSections = record ? splitRecordSections(record.answer) : [];
+  const displayRecord = record ? parseInterviewRecordDisplay(record) : null;
+  const questionSections = displayRecord?.questionSections || [];
+  const answerSections = displayRecord?.answerSections || [];
   const shouldRenderConversation = questionSections.length > 1 || answerSections.length > 1;
   const conversationTurnCount = Math.max(questionSections.length, answerSections.length);
 
@@ -57,13 +51,22 @@ export default function InterviewRecordDetailsModal({
                 <Chip variant="soft">{PositionLabels[record.position as PositionKey]}</Chip>
               </Box>
 
+              {displayRecord?.projectName && (
+                <Box>
+                  <Typography level="title-sm" sx={{ color: "primary.600" }}>
+                    Project
+                  </Typography>
+                  <Chip variant="soft" color="warning">
+                    {displayRecord.projectName}
+                  </Chip>
+                </Box>
+              )}
+
               <Box>
                 <Typography level="title-sm" sx={{ color: "primary.600" }}>
                   Time
                 </Typography>
-                <Typography level="body-sm">
-                  {record.created_at ? new Date(record.created_at).toLocaleString() : "N/A"}
-                </Typography>
+                <Typography level="body-sm">{formatLocalDateTime(record.created_at)}</Typography>
               </Box>
 
               <Divider />

@@ -22,8 +22,11 @@ import {
 } from "@mui/icons-material";
 import { type InterviewRecord, PositionLabels, type PositionKey } from "../types/interview";
 import { getInterviewRecords } from "../api/api";
+import ConfirmActionModal from "./ConfirmActionModal";
 import InterviewRecordDetailsModal from "./InterviewRecordDetailsModal";
 import { useAuthStore } from "../stores/useAuthStore";
+import { formatLocalDate, formatLocalTime, getBackendDateTime } from "../utils/dateTime";
+import { parseInterviewRecordDisplay } from "../utils/interviewRecordDisplay";
 
 interface InterviewHistoryProps {
   selectedPosition: string;
@@ -35,6 +38,8 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
   const [filterPosition, setFilterPosition] = useState<string>(selectedPosition || "all");
   const [selectedRecord, setSelectedRecord] = useState<InterviewRecord | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<InterviewRecord | null>(null);
+  const [isClearAllConfirmOpen, setIsClearAllConfirmOpen] = useState(false);
 
   const userId = useAuthStore((state) => state.user_id);
 
@@ -66,7 +71,8 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
       setRecords(
         res.records.sort(
           (a: InterviewRecord, b: InterviewRecord) =>
-            new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime(),
+            (getBackendDateTime(b.created_at)?.getTime() || 0) -
+            (getBackendDateTime(a.created_at)?.getTime() || 0),
         ),
       );
     } catch (error) {
@@ -84,13 +90,16 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
     setModalOpen(true);
   };
 
-  const handleDeleteRecord = (recordId: string) => {
-    const updatedRecords = records.filter((record) => record.id !== recordId);
+  const handleDeleteRecord = () => {
+    if (!recordToDelete?.id) return;
+    const updatedRecords = records.filter((record) => record.id !== recordToDelete.id);
     setRecords(updatedRecords);
+    setRecordToDelete(null);
   };
 
   const clearAllRecords = () => {
     setRecords([]);
+    setIsClearAllConfirmOpen(false);
   };
 
   const getScoreColor = (score: number) => {
@@ -138,7 +147,15 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 3 }}>
         <Card sx={statCardSx("primary.500", 0)}>
           <CardContent>
-            <Typography level="body-xs" sx={{ color: "neutral.500", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <Typography
+              level="body-xs"
+              sx={{
+                color: "neutral.500",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
+            >
               Total Practice Sessions
             </Typography>
             <Typography level="h3">{filteredRecords.length}</Typography>
@@ -147,7 +164,15 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
 
         <Card sx={statCardSx("success.500", 1)}>
           <CardContent>
-            <Typography level="body-xs" sx={{ color: "neutral.500", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <Typography
+              level="body-xs"
+              sx={{
+                color: "neutral.500",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
+            >
               Average Score
             </Typography>
             <Typography level="h3">{calculateAverageScore()}</Typography>
@@ -157,7 +182,15 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
         <Card sx={statCardSx(calculateImprovement() >= 0 ? "success.500" : "danger.500", 2)}>
           <CardContent>
             <Stack direction="row" alignItems="center" spacing={1}>
-              <Typography level="body-xs" sx={{ color: "neutral.500", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <Typography
+                level="body-xs"
+                sx={{
+                  color: "neutral.500",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
                 Recent Improvement
               </Typography>
               {getScoreIcon(calculateImprovement())}
@@ -173,9 +206,16 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
       {/* Filter and Actions */}
       <Card variant="outlined" sx={{ mb: 3, boxShadow: "sm" }}>
         <CardContent>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }} justifyContent="space-between">
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1.5}
+            alignItems={{ sm: "center" }}
+            justifyContent="space-between"
+          >
             <Stack direction="row" spacing={1} alignItems="center">
-              <Typography level="title-sm" sx={{ whiteSpace: "nowrap" }}>Filter:</Typography>
+              <Typography level="title-sm" sx={{ whiteSpace: "nowrap" }}>
+                Filter:
+              </Typography>
               <Select
                 value={filterPosition}
                 onChange={(_, value) => setFilterPosition(value || "all")}
@@ -194,7 +234,7 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
               color="danger"
               variant="soft"
               startDecorator={<DeleteIcon />}
-              onClick={clearAllRecords}
+              onClick={() => setIsClearAllConfirmOpen(true)}
               disabled={records.length === 0}
             >
               Clear All Records
@@ -239,70 +279,83 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
               </tr>
             </thead>
             <tbody>
-              {filteredRecords.map((record, index) => (
-                <tr key={record.id}>
-                  <td>
-                    <Typography level="body-sm">
-                      {record.created_at ? new Date(record.created_at).toLocaleDateString() : ""}
-                    </Typography>
-                    <Typography level="body-xs" sx={{ color: "neutral.400" }}>
-                      {record.created_at ? new Date(record.created_at).toLocaleTimeString() : ""}
-                    </Typography>
-                  </td>
-                  <td>
-                    <Chip size="sm" variant="soft">
-                      {PositionLabels[record.position as PositionKey] || record.position}
-                    </Chip>
-                  </td>
-                  <td>
-                    <Typography
-                      level="body-sm"
-                      sx={{
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                      }}
-                    >
-                      {record.question_content}
-                    </Typography>
-                  </td>
-                  <td>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Chip
-                        size="sm"
-                        color={getScoreColor(record.score)}
-                        startDecorator={getScoreIcon(
-                          record.score,
-                          filteredRecords[index + 1]?.score,
-                        )}
-                      >
-                        {record.score}
+              {filteredRecords.map((record, index) => {
+                const displayRecord = parseInterviewRecordDisplay(record);
+                return (
+                  <tr key={record.id}>
+                    <td>
+                      <Typography level="body-sm">{formatLocalDate(record.created_at)}</Typography>
+                      <Typography level="body-xs" sx={{ color: "neutral.400" }}>
+                        {formatLocalTime(record.created_at)}
+                      </Typography>
+                    </td>
+                    <td>
+                      <Chip size="sm" variant="soft">
+                        {PositionLabels[record.position as PositionKey] || record.position}
                       </Chip>
-                    </Stack>
-                  </td>
-                  <td>
-                    <Stack direction="row" spacing={0.5}>
-                      <IconButton
-                        size="sm"
-                        variant="soft"
-                        onClick={() => handleViewRecord(record)}
-                      >
-                        <ViewIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                      <IconButton
-                        size="sm"
-                        color="danger"
-                        variant="soft"
-                        onClick={() => handleDeleteRecord(record.id || "")}
-                      >
-                        <DeleteIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </Stack>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td>
+                      <Stack spacing={0.5}>
+                        {displayRecord.projectName && (
+                          <Chip
+                            size="sm"
+                            variant="soft"
+                            color="warning"
+                            sx={{ alignSelf: "flex-start" }}
+                          >
+                            Project: {displayRecord.projectName}
+                          </Chip>
+                        )}
+                        <Typography
+                          level="body-sm"
+                          sx={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                          }}
+                        >
+                          {displayRecord.questionPreview}
+                        </Typography>
+                      </Stack>
+                    </td>
+                    <td>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                          size="sm"
+                          color={getScoreColor(record.score)}
+                          startDecorator={getScoreIcon(
+                            record.score,
+                            filteredRecords[index + 1]?.score,
+                          )}
+                        >
+                          {record.score}
+                        </Chip>
+                      </Stack>
+                    </td>
+                    <td>
+                      <Stack direction="row" spacing={0.5}>
+                        <IconButton
+                          size="sm"
+                          variant="soft"
+                          onClick={() => handleViewRecord(record)}
+                        >
+                          <ViewIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                        <IconButton
+                          size="sm"
+                          color="danger"
+                          variant="soft"
+                          onClick={() => setRecordToDelete(record)}
+                        >
+                          <DeleteIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Stack>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </Table>
         </Card>
@@ -314,6 +367,22 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
         onClose={() => setModalOpen(false)}
         record={selectedRecord}
         getScoreColor={getScoreColor}
+      />
+      <ConfirmActionModal
+        open={!!recordToDelete}
+        onClose={() => setRecordToDelete(null)}
+        onConfirm={handleDeleteRecord}
+        title="Delete Record"
+        description="This will remove this interview record from the current history list."
+        confirmLabel="Delete Record"
+      />
+      <ConfirmActionModal
+        open={isClearAllConfirmOpen}
+        onClose={() => setIsClearAllConfirmOpen(false)}
+        onConfirm={clearAllRecords}
+        title="Clear All Records"
+        description="This will remove all currently loaded interview records from the history list."
+        confirmLabel="Clear All"
       />
     </Box>
   );

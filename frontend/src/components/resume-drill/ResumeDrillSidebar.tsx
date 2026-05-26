@@ -8,9 +8,6 @@ import {
   Chip,
   Divider,
   IconButton,
-  Modal,
-  ModalClose,
-  ModalDialog,
   Option,
   Select,
   Stack,
@@ -26,6 +23,7 @@ import {
   UploadFile as UploadFileIcon,
   Visibility as VisibilityIcon,
 } from "@mui/icons-material";
+import ConfirmActionModal from "../ConfirmActionModal";
 import type { ResumeProject, ResumeResource } from "../../types/interview";
 
 const DRILL_POINT_OPTIONS = [1, 2, 3, 5];
@@ -323,41 +321,14 @@ export default function ResumeDrillSidebar({
         </Stack>
       </Stack>
 
-      <Modal
+      <ConfirmActionModal
         open={isDeleteConfirmOpen}
         onClose={() => setIsDeleteConfirmOpen(false)}
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          p: 2,
-        }}
-      >
-        <ModalDialog variant="outlined" sx={{ maxWidth: 420, width: "90vw" }}>
-          <ModalClose />
-          <Box sx={{ p: 2 }}>
-            <Typography level="h4" sx={{ mb: 1, textAlign: "center" }}>
-              Delete Resume
-            </Typography>
-            <Typography level="body-md" sx={{ mb: 3, textAlign: "center", color: "neutral.600" }}>
-              This will remove the current resume and clear any active resume drill progress. Saved
-              interview history will not be deleted.
-            </Typography>
-            <Stack direction="row" spacing={2} justifyContent="center">
-              <Button
-                variant="outlined"
-                color="neutral"
-                onClick={() => setIsDeleteConfirmOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button color="danger" onClick={handleConfirmDelete}>
-                Delete Resume
-              </Button>
-            </Stack>
-          </Box>
-        </ModalDialog>
-      </Modal>
+        onConfirm={handleConfirmDelete}
+        title="Delete Resume"
+        description="This will remove the current resume and clear any active resume drill progress. Saved interview history will not be deleted."
+        confirmLabel="Delete Resume"
+      />
     </Box>
   );
 }

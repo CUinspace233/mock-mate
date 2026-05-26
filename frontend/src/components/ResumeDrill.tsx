@@ -5,6 +5,10 @@ import ResumeDrillSidebar from "./resume-drill/ResumeDrillSidebar";
 import ResumePreviewModal from "./resume-drill/ResumePreviewModal";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
 import {
+  formatRecordProjectSection,
+  RECORD_SECTION_SEPARATOR,
+} from "../utils/interviewRecordDisplay";
+import {
   completeSession,
   deleteCurrentResume,
   evaluateAnswer,
@@ -63,8 +67,6 @@ type ResumeDrillDraft = {
 };
 
 const draftKey = (userId: number) => `resume-drill-draft:${userId}`;
-const RECORD_SECTION_SEPARATOR = "\n---\n";
-
 const serializeMessage = (message: Message): PersistedMessage => ({
   ...message,
   timestamp: message.timestamp.toISOString(),
@@ -641,6 +643,10 @@ export default function ResumeDrill({
     if (!activeProject || !mainQuestionId) return;
     const interviewerQuestions =
       formatConversationEntries(history, "interviewer") || originalQuestion;
+    const questionContent = [
+      formatRecordProjectSection(activeProject.name),
+      interviewerQuestions,
+    ].join(RECORD_SECTION_SEPARATOR);
     const candidateAnswers = formatConversationEntries(history, "candidate");
 
     const evaluation =
@@ -666,7 +672,7 @@ export default function ResumeDrill({
     addEvaluationMessage(evaluation);
     await saveInterviewRecord(userId, {
       id: null,
-      question_content: interviewerQuestions,
+      question_content: questionContent,
       answer: candidateAnswers,
       score: evaluation.score,
       feedback: formatEvaluationContent(evaluation),

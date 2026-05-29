@@ -102,6 +102,19 @@ def _lang_system(lang: str) -> str:
     return f" IMPORTANT: You must respond entirely in {name}. Never use English in your response."
 
 
+def _job_description_prompt(job_description: str | None) -> str:
+    """Return a bounded JD context block for question generation."""
+    jd = (job_description or "").strip()
+    if not jd:
+        return ""
+    return (
+        "\n\nJob description context:\n"
+        f"{jd[:6000]}\n\n"
+        "Use this JD to tailor the interview question to the role's responsibilities, tech stack, "
+        "business context, seniority, and required skills. Do not quote the JD verbatim unless needed."
+    )
+
+
 def _get_client(api_key: str = "") -> OpenAI:
     """Create OpenAI client using provided key, fallback to env var."""
     return OpenAI(api_key=api_key) if api_key else OpenAI()
@@ -285,6 +298,7 @@ async def generate_ai_question(
     language: str = "en",
     openai_model: str = "gpt-5.4-mini",
     creativity: CreativityLevel = CreativityLevel.BALANCED,
+    job_description: str | None = None,
 ) -> GeneratedQuestion:
     """Generate a question using AI (OpenAI GPT)"""
     client = _get_client(openai_api_key)
@@ -292,7 +306,9 @@ async def generate_ai_question(
         f"Generate a {difficulty} level {question_type} interview question for a {position} position. "
         "The question must be specific and knowledge-based — test a concrete concept, principle, API, "
         "algorithm, or technical detail. Do NOT ask broad or open-ended questions like 'Tell me about...' "
-        "or 'Describe your experience with...'. Return only the question." + _lang_prompt(language)
+        "or 'Describe your experience with...'. Return only the question."
+        + _job_description_prompt(job_description)
+        + _lang_prompt(language)
     )
 
     temperature, top_p = _sampling_for(creativity)
@@ -341,6 +357,7 @@ async def generate_question_stream(
             f"Generate a {req.difficulty} level {req.question_type} interview question for a {req.position} position. "
             "This is the final question — it can be a broader, open-ended question that tests the candidate's "
             "overall understanding, design thinking, or practical experience. Return only the question."
+            + _job_description_prompt(req.job_description)
             + lang_p
         )
     else:
@@ -348,7 +365,9 @@ async def generate_question_stream(
             f"Generate a {req.difficulty} level {req.question_type} interview question for a {req.position} position. "
             "The question must be specific and knowledge-based — test a concrete concept, principle, API, "
             "algorithm, or technical detail. Do NOT ask broad or open-ended questions like 'Tell me about...' "
-            "or 'Describe your experience with...'. Return only the question." + lang_p
+            "or 'Describe your experience with...'. Return only the question."
+            + _job_description_prompt(req.job_description)
+            + lang_p
         )
 
     instructions = (
@@ -453,7 +472,9 @@ async def generate_followup_stream(
         "Based on the candidate's last answer, generate a probing follow-up question "
         "that digs deeper into their understanding. The follow-up must be specific and knowledge-based — "
         "ask about a concrete concept, mechanism, or technical detail related to their answer. "
-        "Return only the follow-up question." + _lang_prompt(req.language)
+        "Return only the follow-up question."
+        + _job_description_prompt(req.job_description)
+        + _lang_prompt(req.language)
     )
 
     instructions = (
@@ -787,6 +808,7 @@ async def generate_question(
             request.language,
             request.openai_model,
             request.creativity,
+            request.job_description,
         )
 
         question = models.Question(

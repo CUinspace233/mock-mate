@@ -57,12 +57,28 @@ EVALUATION_TEXT_FORMAT = {
 }
 
 
+def _job_description_prompt(job_description: str | None) -> str:
+    """Return a bounded JD context block for answer evaluation."""
+    jd = (job_description or "").strip()
+    if not jd:
+        return ""
+    return f"""
+    Job Description Context:
+    {jd[:6000]}
+
+    Use this JD as role context when judging relevance. Keep the same scoring dimensions, but let
+    JD alignment inform completeness and practical_experience where appropriate. Feedback may call
+    out requirements from the JD that the candidate covered or missed.
+    """
+
+
 async def evaluate_answer_ai(
     question_content: str,
     answer: str,
     expected_keywords: list[str],
     openai_api_key: str = "",
     openai_model: str = "gpt-5.4-mini",
+    job_description: str | None = None,
 ) -> AnswerEvaluationResult:
     """AI-powered answer evaluation using OpenAI GPT with structured output"""
     client = OpenAI(api_key=openai_api_key) if openai_api_key else OpenAI()
@@ -73,6 +89,7 @@ async def evaluate_answer_ai(
     Question: {question_content}
     Expected Keywords: {', '.join(expected_keywords)}
     Answer: {answer}
+    {_job_description_prompt(job_description)}
 
     Score based on: technical accuracy (40%), communication clarity (30%), completeness (20%), practical experience (10%).
     All sub-scores (technical_accuracy, communication_clarity, completeness, practical_experience) should be 0-100.
@@ -215,6 +232,7 @@ async def evaluate_answer(request: EvaluateAnswerRequest, db: AsyncSession = Dep
             expected_keywords or [],
             request.openai_api_key,
             request.openai_model,
+            request.job_description,
         )
 
         answer_evaluation = models.AnswerEvaluation(
@@ -264,6 +282,7 @@ async def evaluate_followup_ai(
     conversation_history: list[dict],
     openai_api_key: str = "",
     openai_model: str = "gpt-5.4-mini",
+    job_description: str | None = None,
 ) -> AnswerEvaluationResult:
     """AI-powered evaluation of a full multi-turn interview conversation."""
     client = OpenAI(api_key=openai_api_key) if openai_api_key else OpenAI()
@@ -280,6 +299,7 @@ async def evaluate_followup_ai(
 
     Full Conversation:
     {conversation_text}
+    {_job_description_prompt(job_description)}
 
     Score based on: technical accuracy (40%), communication clarity (30%), completeness (20%), practical experience (10%).
     Consider how well the candidate handled follow-up questions and whether their answers showed depth of understanding.
@@ -345,6 +365,7 @@ async def evaluate_followup(request: EvaluateFollowUpRequest, db: AsyncSession =
             conversation_dicts,
             request.openai_api_key,
             request.openai_model,
+            request.job_description,
         )
 
         # Concatenate all candidate answers for the record

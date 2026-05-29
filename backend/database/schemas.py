@@ -116,6 +116,7 @@ class GenerateQuestionRequest(BaseModel):
     language: str = "en"
     session_id: str | None = None
     creativity: CreativityLevel = CreativityLevel.BALANCED
+    job_description: str | None = None
 
 
 class GenerateQuestionResponse(BaseModel):
@@ -165,6 +166,7 @@ class GenerateFollowUpRequest(BaseModel):
     language: str = "en"
     session_id: str | None = None
     creativity: CreativityLevel = CreativityLevel.BALANCED
+    job_description: str | None = None
 
 
 class ResumeProject(BaseModel):
@@ -226,6 +228,7 @@ class EvaluateFollowUpRequest(BaseModel):
     session_id: str | None = None
     openai_api_key: str
     openai_model: str = "gpt-5.4-mini"
+    job_description: str | None = None
 
 
 class EvaluateAnswerRequest(BaseModel):
@@ -235,6 +238,7 @@ class EvaluateAnswerRequest(BaseModel):
     session_id: str | None = None
     openai_api_key: str
     openai_model: str = "gpt-5.4-mini"
+    job_description: str | None = None
 
 
 class EvaluationDetails(BaseModel):

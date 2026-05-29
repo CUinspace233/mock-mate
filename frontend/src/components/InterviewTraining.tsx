@@ -131,6 +131,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<Message | null>(null);
   const [awaitingAnswer, setAwaitingAnswer] = useState(false);
+  const [jobDescription, setJobDescription] = useState("");
 
   const handleQuestionNumberIncrement = useCallback(
     () => setCurrentQuestionNumber((n) => n + 1),
@@ -227,6 +228,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
     setCurrentQuestion(null);
     setAwaitingAnswer(false);
     setCurrentQuestionNumber(0);
+    setJobDescription("");
     setSessionId(null);
   };
 
@@ -869,6 +871,8 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
                 language={language}
                 openaiModel={openaiModel}
                 questionCreativity={questionCreativity}
+                jobDescription={jobDescription}
+                setJobDescription={setJobDescription}
               />
             </TabPanel>
 

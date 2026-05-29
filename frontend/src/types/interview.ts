@@ -63,6 +63,7 @@ export interface GenerateQuestionRequest {
   language?: string;
   session_id?: string;
   creativity?: CreativityLevel;
+  job_description?: string;
 }
 
 export interface GenerateQuestionResponse {
@@ -83,6 +84,7 @@ export interface EvaluateAnswerRequest {
   session_id?: string;
   openai_api_key: string;
   openai_model?: string;
+  job_description?: string;
 }
 
 // Follow-up conversation types
@@ -104,6 +106,7 @@ export interface FollowUpRequest {
   language?: string;
   session_id?: string;
   creativity?: CreativityLevel;
+  job_description?: string;
 }
 
 export interface FollowUpStreamResponse extends GenerateQuestionResponse {
@@ -170,6 +173,7 @@ export interface EvaluateFollowUpRequest {
   session_id?: string;
   openai_api_key: string;
   openai_model?: string;
+  job_description?: string;
 }
 
 export interface EvaluationDetails {

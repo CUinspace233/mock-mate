@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Markdown from "react-markdown";
 import {
   Box,
@@ -77,6 +77,8 @@ interface InterviewChatProps {
   language: string;
   openaiModel: string;
   questionCreativity: CreativityLevel;
+  jobDescription: string;
+  setJobDescription: React.Dispatch<React.SetStateAction<string>>;
 }
 
 export default function InterviewChat({
@@ -105,6 +107,8 @@ export default function InterviewChat({
   language,
   openaiModel,
   questionCreativity,
+  jobDescription,
+  setJobDescription,
 }: InterviewChatProps) {
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -117,6 +121,11 @@ export default function InterviewChat({
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_responseId, setResponseId] = useState<string | null>(null); // OpenAI response ID for follow-up chaining
+  const trimmedJobDescription = jobDescription.trim();
+  const jobDescriptionPayload = useMemo(
+    () => (trimmedJobDescription ? { job_description: trimmedJobDescription.slice(0, 6000) } : {}),
+    [trimmedJobDescription],
+  );
 
   // Follow-up state
   const [followUpCount, setFollowUpCount] = useState(0);
@@ -170,6 +179,7 @@ export default function InterviewChat({
         is_last_question: currentQuestionNumber + 1 >= questionCountTarget,
         language,
         session_id: sessionIdRef.current || undefined,
+        ...jobDescriptionPayload,
       };
 
       // Insert a placeholder AI message to stream into
@@ -257,6 +267,7 @@ export default function InterviewChat({
           is_last_question: currentQuestionNumber + 1 >= questionCountTarget,
           language,
           session_id: sessionIdRef.current || undefined,
+          ...jobDescriptionPayload,
         };
 
         const data = await generateQuestionApi(req);
@@ -341,6 +352,7 @@ export default function InterviewChat({
     currentQuestionNumber,
     questionCountTarget,
     language,
+    jobDescriptionPayload,
   ]);
 
   const processPresetQuestion = useCallback(
@@ -446,6 +458,7 @@ export default function InterviewChat({
         session_id: sessionIdRef.current || undefined,
         openai_api_key: openaiApiKey,
         openai_model: openaiModel,
+        ...jobDescriptionPayload,
       });
     } else {
       // Single-turn: evaluate just the answer
@@ -455,6 +468,7 @@ export default function InterviewChat({
         answer: answer,
         openai_api_key: openaiApiKey,
         openai_model: openaiModel,
+        ...jobDescriptionPayload,
       });
     }
 
@@ -537,6 +551,7 @@ export default function InterviewChat({
         creativity: questionCreativity,
         language,
         session_id: sessionIdRef.current || undefined,
+        ...jobDescriptionPayload,
       },
       (delta: string) => {
         if (!firstDeltaHandled) {
@@ -740,6 +755,28 @@ export default function InterviewChat({
         <Typography level="body-sm" sx={{ color: "neutral.400", mb: 4 }}>
           Real-time feedback and scoring after each answer
         </Typography>
+        <Box sx={{ maxWidth: 640, mx: "auto", mb: 3, textAlign: "left" }}>
+          <Textarea
+            minRows={4}
+            maxRows={7}
+            value={jobDescription}
+            onChange={(event) => setJobDescription(event.target.value.slice(0, 6000))}
+            placeholder="Optional: paste the target job description so questions and feedback can focus on the role."
+            size="md"
+            variant="outlined"
+            sx={{
+              bgcolor: "background.surface",
+              borderColor: "neutral.200",
+              boxShadow: "xs",
+              "--Textarea-focusedHighlight": "var(--joy-palette-primary-400)",
+            }}
+            endDecorator={
+              <Typography level="body-xs" sx={{ ml: "auto", color: "neutral.400" }}>
+                {trimmedJobDescription.length}/6000
+              </Typography>
+            }
+          />
+        </Box>
         <Button
           size="lg"
           startDecorator={isLoading ? undefined : <PlayArrowIcon />}

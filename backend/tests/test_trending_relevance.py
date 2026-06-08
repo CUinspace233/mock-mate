@@ -21,7 +21,8 @@ class CountKeywordHitsTests(unittest.TestCase):
 
 class CalculateRelevanceScoreTests(unittest.TestCase):
     def setUp(self):
-        self.now = datetime(2026, 5, 24, 12, 0, 0, tzinfo=UTC)
+        # Align with calculate_relevance_score, which measures recency against datetime.now(UTC).
+        self.now = datetime.now(UTC)
         self.news_item = {
             "title": "React 19 release brings new compiler optimizations",
             "summary": "Frontend teams are evaluating JavaScript migration paths.",

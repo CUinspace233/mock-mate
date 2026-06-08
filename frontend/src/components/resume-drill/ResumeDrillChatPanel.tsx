@@ -18,14 +18,16 @@ import {
 import {
   Cancel as CancelIcon,
   Description as DescriptionIcon,
-  Gavel as GavelIcon,
   Mic as MicIcon,
+  FactCheck as FactCheckIcon,
   PlayArrow as PlayArrowIcon,
   Replay as ReplayIcon,
   Send as SendIcon,
   Stop as StopIcon,
 } from "@mui/icons-material";
 import type { Message, ResumeProject, ResumeResource } from "../../types/interview";
+import MockMateIcon from "../MockMateIcon";
+import ThinkingDots from "../interview/ThinkingDots";
 
 interface ResumeDrillChatPanelProps {
   resume: ResumeResource | null;
@@ -107,6 +109,11 @@ export default function ResumeDrillChatPanel({
         minWidth: 0,
         flexDirection: "column",
         overflow: "hidden",
+        bgcolor: "background.surface",
+        border: "1px solid",
+        borderColor: "neutral.200",
+        borderRadius: "lg",
+        boxShadow: "xs",
       }}
     >
       <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "neutral.200" }}>
@@ -137,7 +144,7 @@ export default function ResumeDrillChatPanel({
           </Box>
           <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
             {isStarted && activeProject && (
-              <Chip color="warning" variant="soft" size="sm">
+              <Chip color="neutral" variant="soft" size="sm">
                 Project {activeProjectIndex + 1}/{resume?.projects.length || 0} · Point{" "}
                 {activePointNumber}/{drillPointCount} · Q {questionNumber}/{questionsPerProject}
               </Chip>
@@ -158,10 +165,11 @@ export default function ResumeDrillChatPanel({
           flex: 1,
           minHeight: 0,
           overflow: "auto",
-          p: 2,
+          p: { xs: 1.5, md: 2 },
           display: "flex",
           flexDirection: "column",
           gap: 1.5,
+          bgcolor: "background.surface",
         }}
       >
         {!resume && (
@@ -176,7 +184,7 @@ export default function ResumeDrillChatPanel({
 
         {hasPendingProjectSelection && selectedProject && (
           <Box sx={{ py: 8, textAlign: "center", color: "neutral.500" }}>
-            <GavelIcon sx={{ fontSize: 44, mb: 1, color: "neutral.300" }} />
+            <FactCheckIcon sx={{ fontSize: 44, mb: 1, color: "neutral.300" }} />
             <Typography level="title-md">{selectedProject.name}</Typography>
             <Typography level="body-sm">
               Start this project to clear the previous drill view and generate its first question.
@@ -193,23 +201,23 @@ export default function ResumeDrillChatPanel({
             alignItems="flex-start"
           >
             {message.sender === "ai" && (
-              <Avatar size="sm" sx={{ bgcolor: "#111827", color: "#fff" }}>
-                <GavelIcon fontSize="small" />
+              <Avatar size="sm" sx={{ bgcolor: "transparent", "--Icon-fontSize": "28px" }}>
+                <MockMateIcon size={28} alt="MockMate AI" />
               </Avatar>
             )}
             <Card
               variant={message.sender === "user" ? "soft" : "outlined"}
               sx={{
-                maxWidth: { xs: "88%", md: "74%" },
-                bgcolor: message.sender === "user" ? "warning.50" : "background.surface",
-                borderColor: message.sender === "user" ? "warning.200" : "neutral.200",
+                maxWidth: { xs: "88%", md: "76%" },
+                bgcolor: message.sender === "user" ? "neutral.100" : "background.surface",
+                borderColor: "neutral.200",
+                boxShadow: "none",
+                borderRadius: "lg",
               }}
             >
               <CardContent sx={{ p: 1.5 }}>
                 {message.id.startsWith("temp-") && !message.content ? (
-                  <Typography level="body-sm" sx={{ color: "neutral.500" }}>
-                    Drilling into the project...
-                  </Typography>
+                  <ThinkingDots />
                 ) : (
                   <Typography
                     level="body-md"
@@ -237,7 +245,7 @@ export default function ResumeDrillChatPanel({
       </Box>
 
       <Divider />
-      <Box sx={{ p: 2, bgcolor: "neutral.50", flexShrink: 0 }}>
+      <Box sx={{ p: 2, bgcolor: "background.surface", flexShrink: 0 }}>
         {isComplete ? (
           <Alert color="success" variant="soft">
             Resume drill completed. Your project-level records were saved.

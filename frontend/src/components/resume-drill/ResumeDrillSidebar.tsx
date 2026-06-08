@@ -19,8 +19,8 @@ import {
   ChevronRight as ChevronRightIcon,
   Delete as DeleteIcon,
   Description as DescriptionIcon,
-  Gavel as GavelIcon,
   UploadFile as UploadFileIcon,
+  FactCheck as FactCheckIcon,
   Visibility as VisibilityIcon,
 } from "@mui/icons-material";
 import ConfirmActionModal from "../ConfirmActionModal";
@@ -95,11 +95,12 @@ export default function ResumeDrillSidebar({
     <Box
       sx={{
         minWidth: 0,
-        borderRight: { md: "1px solid #e5e7eb" },
-        borderBottom: { xs: "1px solid", md: "none" },
+        border: "1px solid",
         borderColor: "neutral.200",
+        borderRadius: "lg",
         p: { xs: 2, md: isCollapsed ? 1 : 2 },
-        bgcolor: "#fbfbf7",
+        bgcolor: "background.surface",
+        boxShadow: "xs",
         overflow: { xs: "visible", md: isCollapsed ? "hidden" : "auto" },
         scrollbarWidth: isCollapsed ? "none" : "auto",
         "&::-webkit-scrollbar": {
@@ -121,8 +122,8 @@ export default function ResumeDrillSidebar({
               <ChevronRightIcon />
             </IconButton>
           </Tooltip>
-          <Avatar size="sm" sx={{ bgcolor: "#111827", color: "#fff" }}>
-            <GavelIcon fontSize="small" />
+          <Avatar size="sm" sx={{ bgcolor: "primary.50", color: "primary.600" }}>
+            <FactCheckIcon fontSize="small" />
           </Avatar>
           {resume && (
             <Tooltip title="Preview parsed JSON" placement="right">
@@ -146,8 +147,8 @@ export default function ResumeDrillSidebar({
           alignItems="center"
           sx={{ display: { xs: "flex", md: isCollapsed ? "none" : "flex" } }}
         >
-          <Avatar size="sm" sx={{ bgcolor: "#111827", color: "#fff" }}>
-            <GavelIcon fontSize="small" />
+          <Avatar size="sm" sx={{ bgcolor: "primary.50", color: "primary.600" }}>
+            <FactCheckIcon fontSize="small" />
           </Avatar>
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography level="title-md">Resume Drill</Typography>
@@ -170,7 +171,7 @@ export default function ResumeDrillSidebar({
 
         <Button
           component="label"
-          variant="solid"
+          variant="soft"
           color="neutral"
           startDecorator={<UploadFileIcon />}
           loading={isUploading}
@@ -194,7 +195,8 @@ export default function ResumeDrillSidebar({
             variant="outlined"
             sx={{
               bgcolor: "background.surface",
-              boxShadow: "xs",
+              boxShadow: "none",
+              borderColor: "neutral.200",
               display: { xs: "block", md: isCollapsed ? "none" : "block" },
             }}
           >
@@ -303,10 +305,15 @@ export default function ResumeDrillSidebar({
             <Button
               key={project.project_id}
               variant={index === selectedProjectIndex ? "soft" : "plain"}
-              color={index === activeProjectIndex && isStarted ? "warning" : "neutral"}
+              color={index === activeProjectIndex && isStarted ? "primary" : "neutral"}
               disabled={isStarted && !canAdvanceProject}
               onClick={() => onProjectSelect(index)}
-              sx={{ justifyContent: "flex-start", textAlign: "left", minHeight: 54 }}
+              sx={{
+                justifyContent: "flex-start",
+                textAlign: "left",
+                minHeight: 54,
+                borderRadius: "md",
+              }}
             >
               <Box sx={{ minWidth: 0 }}>
                 <Typography level="body-sm" noWrap sx={{ fontWeight: 700 }}>

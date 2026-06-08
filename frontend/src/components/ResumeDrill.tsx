@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box } from "@mui/joy";
+import ConfirmActionModal from "./ConfirmActionModal";
 import ResumeDrillChatPanel from "./resume-drill/ResumeDrillChatPanel";
 import ResumeDrillSidebar from "./resume-drill/ResumeDrillSidebar";
 import ResumePreviewModal from "./resume-drill/ResumePreviewModal";
@@ -8,6 +9,7 @@ import {
   formatRecordProjectSection,
   RECORD_SECTION_SEPARATOR,
 } from "../utils/interviewRecordDisplay";
+import { useAuthStore } from "../stores/useAuthStore";
 import {
   completeSession,
   deleteCurrentResume,
@@ -17,6 +19,7 @@ import {
   generateResumeQuestionStream,
   getCurrentResume,
   getSessionDetail,
+  openaiModelPayload,
   recoverQuestions,
   saveInterviewRecord,
   startInterviewSession,
@@ -140,6 +143,8 @@ export default function ResumeDrill({
   const [error, setError] = useState("");
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
   const [isResumePreviewOpen, setIsResumePreviewOpen] = useState(false);
+  const [showCancelDrillModal, setShowCancelDrillModal] = useState(false);
+  const [isCancelingDrill, setIsCancelingDrill] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const shouldJumpToBottomRef = useRef(true);
@@ -479,7 +484,7 @@ export default function ResumeDrill({
                 difficulty: selectedDifficulty,
                 user_id: userId,
                 openai_api_key: openaiApiKey,
-                openai_model: openaiModel,
+                ...openaiModelPayload(openaiModel),
                 language,
                 creativity: questionCreativity,
                 session_id: sessionIdOverride || sessionId || undefined,
@@ -500,7 +505,7 @@ export default function ResumeDrill({
                 difficulty: selectedDifficulty,
                 user_id: userId,
                 openai_api_key: openaiApiKey,
-                openai_model: openaiModel,
+                ...openaiModelPayload(openaiModel),
                 language,
                 creativity: questionCreativity,
                 session_id: sessionIdOverride || sessionId || undefined,
@@ -639,6 +644,16 @@ export default function ResumeDrill({
     }
   };
 
+  const handleConfirmCancelDrill = async () => {
+    setIsCancelingDrill(true);
+    try {
+      await cancelDrill();
+      setShowCancelDrillModal(false);
+    } finally {
+      setIsCancelingDrill(false);
+    }
+  };
+
   const completeProject = async (history: ConversationEntry[]) => {
     if (!activeProject || !mainQuestionId) return;
     const interviewerQuestions =
@@ -658,7 +673,7 @@ export default function ResumeDrill({
             conversation_history: history,
             session_id: sessionId || undefined,
             openai_api_key: openaiApiKey,
-            openai_model: openaiModel,
+            ...openaiModelPayload(openaiModel),
           })
         : await evaluateAnswer({
             question_id: mainQuestionId,
@@ -666,7 +681,7 @@ export default function ResumeDrill({
             answer: candidateAnswers,
             session_id: sessionId || undefined,
             openai_api_key: openaiApiKey,
-            openai_model: openaiModel,
+            ...openaiModelPayload(openaiModel),
           });
 
     addEvaluationMessage(evaluation);
@@ -768,6 +783,7 @@ export default function ResumeDrill({
       if (sessionId) {
         await completeSession(sessionId, { user_id: userId });
       }
+      useAuthStore.getState().incrementDailySessionCount();
       setIsComplete(true);
       setIsStarted(false);
       setSessionId(null);
@@ -843,15 +859,16 @@ export default function ResumeDrill({
       sx={{
         width: "100%",
         minWidth: 0,
-        height: { xs: "auto", md: "calc(100dvh - 245px)" },
-        minHeight: 0,
+        height: { xs: "auto", md: "calc(100dvh - 132px)" },
+        minHeight: { xs: 0, md: 640 },
         display: "grid",
         gridTemplateColumns: {
           xs: "minmax(0, 1fr)",
-          md: isSidebarCollapsed ? "64px minmax(0, 1fr)" : "minmax(260px, 320px) minmax(0, 1fr)",
+          md: isSidebarCollapsed ? "64px minmax(0, 1fr)" : "minmax(260px, 300px) minmax(0, 1fr)",
         },
         gridTemplateRows: { xs: "auto auto", md: "minmax(0, 1fr)" },
-        overflow: { xs: "visible", md: "hidden" },
+        gap: { xs: 1.5, md: 1.5 },
+        overflow: "visible",
       }}
     >
       <ResumeDrillSidebar
@@ -903,7 +920,7 @@ export default function ResumeDrill({
         messagesScrollRef={messagesScrollRef}
         onAnswerChange={setCurrentAnswer}
         onSendAnswer={() => void handleSendAnswer()}
-        onCancelDrill={() => void cancelDrill()}
+        onCancelDrill={() => setShowCancelDrillModal(true)}
         onToggleRecording={toggleRecording}
         onStartSelectedProject={() => void startSelectedProject()}
         onRestartCurrentProject={() => void restartCurrentProject()}
@@ -916,6 +933,16 @@ export default function ResumeDrill({
         open={isResumePreviewOpen}
         resume={resume}
         onClose={() => setIsResumePreviewOpen(false)}
+      />
+
+      <ConfirmActionModal
+        open={showCancelDrillModal}
+        onClose={() => !isCancelingDrill && setShowCancelDrillModal(false)}
+        onConfirm={() => void handleConfirmCancelDrill()}
+        title="Cancel Resume Drill"
+        description="Are you sure you want to cancel this resume drill? Your current progress might not be saved."
+        confirmLabel="Cancel Drill"
+        loading={isCancelingDrill}
       />
     </Box>
   );

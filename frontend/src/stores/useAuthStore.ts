@@ -27,6 +27,7 @@ type AuthState = {
   getDecryptedApiKey: () => Promise<string>;
   setDailyQuestionCount: (count: number) => void;
   setDailyQuestionDate: (date: string) => void;
+  incrementDailySessionCount: () => void;
   setSelectedPosition: (position: string) => void;
   setSelectedDifficulty: (difficulty: Difficulty) => void;
   setSessionId: (sessionId: string | null) => void;
@@ -54,13 +55,17 @@ export const useAuthStore = create<AuthState>()(
       setFollowUpLimit: (limit) => set({ followUpLimit: limit }),
       language: "en",
       setLanguage: (language) => set({ language }),
-      openaiModel: "gpt-5.4-mini",
+      openaiModel: "",
       setOpenaiModel: (model) => set({ openaiModel: model }),
       questionCreativity: CreativityLevel.BALANCED,
       setQuestionCreativity: (creativity) => set({ questionCreativity: creativity }),
       openaiApiKey: "",
       setOpenaiApiKey: (apiKey) => {
         const ver = ++encryptVersion;
+        if (!apiKey) {
+          set({ openaiApiKey: "" });
+          return;
+        }
         encryptApiKey(apiKey).then((encrypted) => {
           if (ver === encryptVersion) {
             set({ openaiApiKey: encrypted });
@@ -70,6 +75,15 @@ export const useAuthStore = create<AuthState>()(
       getDecryptedApiKey: () => decryptApiKey(get().openaiApiKey),
       setDailyQuestionCount: (count) => set({ dailyQuestionCount: count }),
       setDailyQuestionDate: (date) => set({ dailyQuestionDate: date }),
+      incrementDailySessionCount: () => {
+        const today = new Date().toISOString().slice(0, 10);
+        const { dailyQuestionCount, dailyQuestionDate } = get();
+        const baseCount = dailyQuestionDate === today ? dailyQuestionCount : 0;
+        set({
+          dailyQuestionCount: baseCount + 1,
+          dailyQuestionDate: today,
+        });
+      },
       setSelectedPosition: (position) => set({ selectedPosition: position }),
       setSelectedDifficulty: (difficulty) => set({ selectedDifficulty: difficulty }),
       setSessionId: (sessionId) => set({ sessionId }),

@@ -26,6 +26,11 @@ import type {
   ResumeDrillFollowUpRequest,
 } from "../types/interview";
 
+export function openaiModelPayload(openaiModel?: string): { openai_model?: string } {
+  const model = openaiModel?.trim();
+  return model ? { openai_model: model } : {};
+}
+
 export async function login(username: string, password: string) {
   const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/users/login`, {
     username,
@@ -312,7 +317,7 @@ export async function getTrendingQuestions(params?: {
 export async function fetchNewsManual(openaiApiKey: string, openaiModel?: string): Promise<void> {
   await axios.post(`${import.meta.env.VITE_API_URL}/api/trending/fetch-news`, {
     openai_api_key: openaiApiKey,
-    openai_model: openaiModel,
+    ...openaiModelPayload(openaiModel),
   });
 }
 
@@ -371,7 +376,10 @@ export async function uploadResume(params: {
   const formData = new FormData();
   formData.append("user_id", params.userId.toString());
   formData.append("openai_api_key", params.openaiApiKey);
-  formData.append("openai_model", params.openaiModel || "gpt-5.4-mini");
+  const model = params.openaiModel?.trim();
+  if (model) {
+    formData.append("openai_model", model);
+  }
   formData.append("language", params.language || "en");
   formData.append("file", params.file);
 

@@ -1,33 +1,16 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import Markdown from "react-markdown";
 import {
   Box,
   Typography,
-  Card,
-  CardContent,
   Button,
-  Textarea,
   Stack,
-  Avatar,
-  Chip,
   Alert,
-  Divider,
-  Modal,
-  ModalDialog,
-  ModalClose,
-  IconButton,
-  Tooltip,
 } from "@mui/joy";
 import {
-  Send as SendIcon,
-  Person as PersonIcon,
   PlayArrow as PlayArrowIcon,
   Refresh as RefreshIcon,
   CheckCircle as CheckIcon,
-  Cancel as CancelIcon,
   ExitToApp as ExitIcon,
-  Mic as MicIcon,
-  Stop as StopIcon,
 } from "@mui/icons-material";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
 import {
@@ -36,6 +19,7 @@ import {
   generateFollowUpStream as generateFollowUpStreamApi,
   evaluateAnswer as evaluateAnswerApi,
   evaluateFollowUpConversation as evaluateFollowUpApi,
+  openaiModelPayload,
   saveInterviewRecord,
 } from "../api/api";
 import {
@@ -48,8 +32,11 @@ import {
   type NewsQuestion,
   QuestionType,
 } from "../types/interview";
+import ConfirmActionModal from "./ConfirmActionModal";
 import CustomAlert from "./CustomAlert";
 import { formatRelativeTime } from "../utils";
+import ChatComposer from "./interview/ChatComposer";
+import ChatThread from "./interview/ChatThread";
 
 interface InterviewChatProps {
   selectedPosition: string;
@@ -108,7 +95,6 @@ export default function InterviewChat({
   openaiModel,
   questionCreativity,
   jobDescription,
-  setJobDescription,
 }: InterviewChatProps) {
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -147,7 +133,16 @@ export default function InterviewChat({
   }, [awaitingAnswer, stopRecording]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const anchor = messagesEndRef.current;
+    if (!anchor) return;
+
+    const container = anchor.closest("[data-chat-scroll]");
+    if (container instanceof HTMLElement) {
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+      return;
+    }
+
+    anchor.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
 
   useEffect(() => {
@@ -174,7 +169,7 @@ export default function InterviewChat({
         question_type: questionType,
         user_id: user_id,
         openai_api_key: openaiApiKey,
-        openai_model: openaiModel,
+        ...openaiModelPayload(openaiModel),
         creativity: questionCreativity,
         is_last_question: currentQuestionNumber + 1 >= questionCountTarget,
         language,
@@ -262,7 +257,7 @@ export default function InterviewChat({
           question_type: questionType,
           user_id: user_id,
           openai_api_key: openaiApiKey,
-          openai_model: openaiModel,
+          ...openaiModelPayload(openaiModel),
           creativity: questionCreativity,
           is_last_question: currentQuestionNumber + 1 >= questionCountTarget,
           language,
@@ -457,7 +452,7 @@ export default function InterviewChat({
         conversation_history: history,
         session_id: sessionIdRef.current || undefined,
         openai_api_key: openaiApiKey,
-        openai_model: openaiModel,
+        ...openaiModelPayload(openaiModel),
         ...jobDescriptionPayload,
       });
     } else {
@@ -467,7 +462,7 @@ export default function InterviewChat({
         user_id: user_id,
         answer: answer,
         openai_api_key: openaiApiKey,
-        openai_model: openaiModel,
+        ...openaiModelPayload(openaiModel),
         ...jobDescriptionPayload,
       });
     }
@@ -547,7 +542,7 @@ export default function InterviewChat({
         difficulty: selectedDifficulty,
         user_id: user_id,
         openai_api_key: openaiApiKey,
-        openai_model: openaiModel,
+        ...openaiModelPayload(openaiModel),
         creativity: questionCreativity,
         language,
         session_id: sessionIdRef.current || undefined,
@@ -707,375 +702,143 @@ export default function InterviewChat({
     return (
       <Box
         sx={{
-          py: { xs: 6, sm: 8 },
-          px: { xs: 3, sm: 4 },
+          minHeight: { xs: "calc(100dvh - 180px)", md: "calc(100dvh - 120px)" },
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          py: { xs: 4, sm: 7 },
+          px: { xs: 1, sm: 3 },
           textAlign: "center",
           animation: "slideUp 0.5s ease-out",
         }}
       >
-        <Box
-          sx={{
-            width: { xs: 72, sm: 96 },
-            height: { xs: 72, sm: 96 },
-            borderRadius: "50%",
-            background: "linear-gradient(135deg, rgba(37,99,235,0.12), rgba(23,37,84,0.08))",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            mx: "auto",
-            mb: 3,
-          }}
-        >
+        <Stack spacing={3} sx={{ maxWidth: 760, mx: "auto", width: "100%" }}>
+          <Stack spacing={1}>
+            <Typography level="h2" sx={{ fontWeight: 750, letterSpacing: 0 }}>
+              Practice like the interview starts today.
+            </Typography>
+            <Typography level="body-md" sx={{ color: "neutral.600", lineHeight: 1.7, maxWidth: 620, mx: "auto" }}>
+              Start a focused AI interview round, answer in your own words, then get structured
+              feedback that reads like a strong interview coach.
+            </Typography>
+          </Stack>
+
           <Box
-            component="img"
-            src="/robot_icon.png"
-            alt="AI"
-            sx={{ width: { xs: 32, sm: 44 }, height: { xs: 32, sm: 44 } }}
-          />
-        </Box>
-        <Typography
-          level="h3"
-          sx={{
-            mb: 1.5,
-            fontWeight: 700,
-            background: "linear-gradient(135deg, #2563eb, #172554)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-          }}
-        >
-          Ready When You Are
-        </Typography>
-        <Typography
-          level="body-md"
-          sx={{ color: "neutral.500", mb: 1, maxWidth: 560, mx: "auto", lineHeight: 1.7 }}
-        >
-          Configure your position, difficulty, and question type above, then start a mock interview
-          session with AI-powered questions.
-        </Typography>
-        <Typography level="body-sm" sx={{ color: "neutral.400", mb: 4 }}>
-          Real-time feedback and scoring after each answer
-        </Typography>
-        <Box sx={{ maxWidth: 640, mx: "auto", mb: 3, textAlign: "left" }}>
-          <Textarea
-            minRows={4}
-            maxRows={7}
-            value={jobDescription}
-            onChange={(event) => setJobDescription(event.target.value.slice(0, 6000))}
-            placeholder="Optional: paste the target job description so questions and feedback can focus on the role."
-            size="md"
-            variant="outlined"
             sx={{
-              bgcolor: "background.surface",
-              borderColor: "neutral.200",
-              boxShadow: "xs",
-              "--Textarea-focusedHighlight": "var(--joy-palette-primary-400)",
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0, 1fr))" },
+              gap: 1,
+              textAlign: "left",
             }}
-            endDecorator={
-              <Typography level="body-xs" sx={{ ml: "auto", color: "neutral.400" }}>
-                {trimmedJobDescription.length}/6000
-              </Typography>
-            }
-          />
-        </Box>
-        <Button
-          size="lg"
-          startDecorator={isLoading ? undefined : <PlayArrowIcon />}
-          onClick={() => {
-            if (!openaiApiKey.trim()) {
-              setError("Please enter your OpenAI API key above before starting an interview.");
-              return;
-            }
-            handleStartNewQuestion();
-          }}
-          loading={isLoading}
-          disabled={isLoading}
-          sx={{
-            px: 5,
-            py: 1.5,
-            fontSize: "1rem",
-            background: "linear-gradient(135deg, #2563eb, #1e40af)",
-            boxShadow: "0 4px 14px rgba(37,99,235,0.35)",
-            "&:hover": {
-              background: "linear-gradient(135deg, #1d4ed8, #1e3a8a)",
-              boxShadow: "0 6px 20px rgba(37,99,235,0.4)",
-            },
-          }}
-        >
-          {isLoading ? "Generating..." : "Start Interview"}
-        </Button>
-        {error && (
-          <Alert color="danger" variant="soft" sx={{ mt: 2, maxWidth: 400, mx: "auto" }}>
-            {error}
-          </Alert>
-        )}
+          >
+            {[
+              "Ask me a system design follow-up",
+              "Pressure-test my project ownership",
+              "Grade my communication clarity",
+            ].map((prompt) => (
+              <Box
+                key={prompt}
+                sx={{
+                  border: "1px solid",
+                  borderColor: "neutral.200",
+                  borderRadius: "lg",
+                  bgcolor: "background.surface",
+                  px: 1.5,
+                  py: 1.25,
+                  color: "neutral.700",
+                  fontSize: "0.9rem",
+                }}
+              >
+                {prompt}
+              </Box>
+            ))}
+          </Box>
+
+          <Stack spacing={1.5} alignItems="center">
+            <Button
+              size="lg"
+              startDecorator={isLoading ? undefined : <PlayArrowIcon />}
+              onClick={() => {
+                if (!openaiApiKey.trim()) {
+                  setError("Please enter your OpenAI API key in Setup before starting an interview.");
+                  return;
+                }
+                handleStartNewQuestion();
+              }}
+              loading={isLoading}
+              disabled={isLoading}
+              sx={{ px: 4 }}
+            >
+              {isLoading ? "Generating..." : "Start interview"}
+            </Button>
+            {error && (
+              <Alert color="danger" variant="soft" sx={{ maxWidth: 460 }}>
+                {error}
+              </Alert>
+            )}
+          </Stack>
+        </Stack>
       </Box>
     );
   }
 
+  const threadMessages =
+    isLoading && !messages.some((m) => m.id.startsWith("temp-"))
+      ? [
+          ...messages,
+          {
+            id: "temp-loading",
+            sender: "ai" as const,
+            content: "",
+            timestamp: new Date(),
+          },
+        ]
+      : messages;
+
   return (
     <Box
       sx={{
-        height: { xs: "calc(100vh - 220px)", sm: "600px" },
+        flex: 1,
+        minHeight: 0,
         display: "flex",
         flexDirection: "column",
+        overflow: "hidden",
       }}
     >
-      {/* Question Progress */}
-      {currentQuestionNumber > 0 && (
-        <Box
-          sx={{ px: 2, pt: 1.5, display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}
-        >
-          <Chip
-            size="sm"
-            variant="soft"
-            color={currentQuestionNumber >= questionCountTarget ? "success" : "primary"}
-          >
-            Question {currentQuestionNumber} / {questionCountTarget}
-          </Chip>
-          {isInFollowUpMode && followUpLimit > 0 && (
-            <Chip size="sm" variant="soft" color="warning">
-              Follow-up {followUpCount} / {followUpLimit}
-            </Chip>
-          )}
-          {currentQuestionNumber >= questionCountTarget && !awaitingAnswer && !isInFollowUpMode && (
-            <Alert size="sm" color="success" variant="soft" sx={{ flex: 1, py: 0.5 }}>
-              You've reached your target! Feel free to continue or complete the session.
-            </Alert>
-          )}
-        </Box>
-      )}
-
-      {/* Error Alert */}
       {error && (
-        <Box sx={{ p: 2 }}>
+        <Box sx={{ maxWidth: 860, mx: "auto", width: "100%", px: 1, pt: 1 }}>
           <CustomAlert type="error" title="Error" message={error} onClose={() => setError("")} />
         </Box>
       )}
+      <ChatThread
+        messages={threadMessages}
+        currentQuestionNumber={currentQuestionNumber}
+        questionCountTarget={questionCountTarget}
+        followUpCount={followUpCount}
+        followUpLimit={followUpLimit}
+        isInFollowUpMode={isInFollowUpMode}
+        bottomRef={messagesEndRef}
+      />
 
-      {/* Messages Area */}
-      <Box
-        sx={{
-          flex: 1,
-          overflow: "auto",
-          p: 2,
-          display: "flex",
-          flexDirection: "column",
-          gap: 2,
-        }}
-      >
-        {messages.map((message) => (
-          <Stack
-            key={message.id}
-            direction="row"
-            spacing={2}
-            sx={{
-              alignItems: "flex-start",
-              justifyContent: message.sender === "user" ? "flex-end" : "flex-start",
-              animation: "fadeIn 0.3s ease-out",
-            }}
-          >
-            {message.sender === "ai" && (
-              <Avatar size="sm" sx={{ bgcolor: "primary.100", color: "primary.600" }}>
-                <Box
-                  component="img"
-                  src="/robot_icon.png"
-                  alt="AI"
-                  sx={{ width: 24, height: 24 }}
-                />
-              </Avatar>
-            )}
-
-            <Card
-              variant={message.sender === "user" ? "soft" : "outlined"}
-              sx={{
-                maxWidth: { xs: "85%", sm: "70%" },
-                boxShadow: "xs",
-                ...(message.sender === "user" && {
-                  order: -1,
-                  bgcolor: "primary.50",
-                  borderColor: "primary.200",
-                  borderRadius: "16px 16px 4px 16px",
-                }),
-                ...(message.sender === "ai" && {
-                  bgcolor: "background.surface",
-                  borderColor: "neutral.200",
-                  borderRadius: "16px 16px 16px 4px",
-                }),
-              }}
-            >
-              <CardContent sx={{ p: 2 }}>
-                {message.id.startsWith("temp-") && !message.content ? (
-                  <Stack direction="row" spacing={0.75} alignItems="center">
-                    {[0, 1, 2].map((i) => (
-                      <Box
-                        key={i}
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          bgcolor: "primary.400",
-                          animation: "dotPulse 1.4s ease-in-out infinite",
-                          animationDelay: `${i * 0.2}s`,
-                        }}
-                      />
-                    ))}
-                  </Stack>
-                ) : (
-                  <Typography
-                    level="body-md"
-                    component="div"
-                    sx={{
-                      color: message.sender === "user" ? "primary.800" : "text.primary",
-                      "& p": { m: 0 },
-                      "& p + p": { mt: 1 },
-                      "& code": {
-                        bgcolor: "neutral.100",
-                        px: 0.5,
-                        py: 0.25,
-                        borderRadius: "4px",
-                        fontSize: "0.85em",
-                        fontFamily: "monospace",
-                      },
-                      "& pre": {
-                        bgcolor: "neutral.100",
-                        p: 1.5,
-                        borderRadius: "8px",
-                        overflow: "auto",
-                        my: 1,
-                      },
-                      "& pre code": {
-                        bgcolor: "transparent",
-                        p: 0,
-                      },
-                    }}
-                  >
-                    <Markdown>{message.content}</Markdown>
-                  </Typography>
-                )}
-                {message.score && (
-                  <Box sx={{ mt: 1 }}>
-                    <Chip
-                      size="sm"
-                      color={
-                        message.score >= 80 ? "success" : message.score >= 70 ? "warning" : "danger"
-                      }
-                      startDecorator={message.score >= 80 ? <CheckIcon /> : <CancelIcon />}
-                    >
-                      {message.score}/100
-                    </Chip>
-                  </Box>
-                )}
-                <Typography level="body-xs" sx={{ color: "neutral.400", mt: 1 }}>
-                  {message.timestamp.toLocaleTimeString()}
-                </Typography>
-              </CardContent>
-            </Card>
-
-            {message.sender === "user" && (
-              <Avatar size="sm" sx={{ bgcolor: "neutral.200", color: "neutral.600" }}>
-                <PersonIcon />
-              </Avatar>
-            )}
-          </Stack>
-        ))}
-
-        {isLoading && !messages.some((m) => m.id.startsWith("temp-")) && (
-          <Stack
-            direction="row"
-            spacing={2}
-            alignItems="center"
-            sx={{ animation: "fadeIn 0.3s ease-out" }}
-          >
-            <Avatar size="sm" sx={{ bgcolor: "primary.100", color: "primary.600" }}>
-              <Box component="img" src="/robot_icon.png" alt="AI" sx={{ width: 24, height: 24 }} />
-            </Avatar>
-            <Card variant="soft" sx={{ borderRadius: "16px 16px 16px 4px" }}>
-              <CardContent sx={{ p: 2 }}>
-                <Stack direction="row" spacing={0.75} alignItems="center">
-                  {[0, 1, 2].map((i) => (
-                    <Box
-                      key={i}
-                      sx={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        bgcolor: "primary.400",
-                        animation: "dotPulse 1.4s ease-in-out infinite",
-                        animationDelay: `${i * 0.2}s`,
-                      }}
-                    />
-                  ))}
-                </Stack>
-              </CardContent>
-            </Card>
-          </Stack>
-        )}
-
-        <div ref={messagesEndRef} />
-      </Box>
-
-      <Divider />
-
-      {/* Input Area */}
-      <Box sx={{ p: { xs: 1.5, sm: 2 }, bgcolor: "neutral.50" }}>
+      <Box sx={{ position: "sticky", bottom: 0, px: { xs: 0.5, sm: 1 }, pb: 1.5, pt: 1 }}>
         {awaitingAnswer && currentQuestion ? (
           <Stack spacing={1.5}>
             {showAlert && (
-              <Alert color="primary" variant="soft" size="sm">
+              <Alert color="primary" variant="soft" size="sm" sx={{ maxWidth: 860, mx: "auto", width: "100%" }}>
                 Answer the question above, then send your response.
               </Alert>
             )}
-            <Textarea
-              placeholder={isRecording ? "Listening..." : "Enter your answer here..."}
+            <ChatComposer
               value={currentAnswer}
-              onChange={(e) => setCurrentAnswer(e.target.value)}
-              minRows={2}
-              maxRows={8}
-              sx={{
-                width: "100%",
-                ...(isRecording && {
-                  borderColor: "danger.500",
-                  "&:focus-within": { borderColor: "danger.500" },
-                }),
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                  handleSendAnswer();
-                }
-              }}
-            />
-            <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
-              <Typography
-                level="body-xs"
-                sx={{ color: "neutral.400", display: { xs: "none", sm: "block" } }}
-              >
-                Ctrl/Cmd+Enter to send{isSupported ? " · click mic to speak" : ""}
-              </Typography>
-              <Stack direction="row" spacing={1}>
-                {isSupported && (
-                  <Tooltip title={isRecording ? "Stop recording" : "Start voice input"}>
-                    <IconButton
-                      variant={isRecording ? "solid" : "outlined"}
-                      color={isRecording ? "danger" : "neutral"}
-                      size="sm"
-                      onClick={toggleRecording}
-                      disabled={isLoading}
-                      sx={
-                        isRecording
-                          ? {
-                              animation: "pulse 1.5s ease-in-out infinite",
-                              "@keyframes pulse": {
-                                "0%, 100%": { opacity: 1 },
-                                "50%": { opacity: 0.6 },
-                              },
-                            }
-                          : undefined
-                      }
-                    >
-                      {isRecording ? <StopIcon /> : <MicIcon />}
-                    </IconButton>
-                  </Tooltip>
-                )}
+              onChange={setCurrentAnswer}
+              onSend={handleSendAnswer}
+              disabled={isLoading}
+              loading={isLoading}
+              isRecording={isRecording}
+              isSupported={isSupported}
+              onToggleRecording={toggleRecording}
+              placeholder="Answer with concrete examples, tradeoffs, and what you personally owned..."
+              leftAction={
                 <Button
                   startDecorator={<ExitIcon />}
                   onClick={handleEndSession}
@@ -1085,20 +848,26 @@ export default function InterviewChat({
                 >
                   End
                 </Button>
-                <Button
-                  startDecorator={<SendIcon />}
-                  onClick={handleSendAnswer}
-                  disabled={!currentAnswer.trim() || isLoading}
-                  color="primary"
-                  size="sm"
-                >
-                  Send
-                </Button>
-              </Stack>
-            </Stack>
+              }
+            />
           </Stack>
         ) : (
-          <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap">
+          <Stack
+            direction="row"
+            spacing={1}
+            justifyContent="center"
+            flexWrap="wrap"
+            sx={{
+              maxWidth: 860,
+              mx: "auto",
+              p: 1,
+              bgcolor: "background.surface",
+              border: "1px solid",
+              borderColor: "neutral.200",
+              borderRadius: "lg",
+              boxShadow: "xs",
+            }}
+          >
             <Button
               startDecorator={<RefreshIcon />}
               onClick={handleStartNewQuestion}
@@ -1123,53 +892,15 @@ export default function InterviewChat({
         )}
       </Box>
 
-      {/* End Session Confirmation Modal */}
-      <Modal
+      <ConfirmActionModal
         open={showEndSessionModal}
         onClose={() => setShowEndSessionModal(false)}
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          p: 2,
-        }}
-      >
-        <ModalDialog
-          variant="outlined"
-          sx={{
-            maxWidth: 400,
-            width: "90vw",
-          }}
-        >
-          <ModalClose />
-          <Box sx={{ p: 2 }}>
-            <Typography level="h4" sx={{ mb: 2, textAlign: "center" }}>
-              End Interview Session
-            </Typography>
-            <Typography level="body-md" sx={{ mb: 3, textAlign: "center" }}>
-              Are you sure you want to end this interview session? Your current progress might not
-              be saved.
-            </Typography>
-            <Stack direction="row" spacing={2} justifyContent="center">
-              <Button
-                variant="outlined"
-                color="neutral"
-                onClick={() => setShowEndSessionModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                color="danger"
-                onClick={handleConfirmEndSession}
-                loading={isCompletingInterview}
-                disabled={isCompletingInterview}
-              >
-                {isCompletingInterview ? "Ending..." : "End Session"}
-              </Button>
-            </Stack>
-          </Box>
-        </ModalDialog>
-      </Modal>
+        onConfirm={() => void handleConfirmEndSession()}
+        title="End Interview Session"
+        description="Are you sure you want to end this interview session? Your current progress might not be saved."
+        confirmLabel="End Session"
+        loading={isCompletingInterview}
+      />
     </Box>
   );
 }

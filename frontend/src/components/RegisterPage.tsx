@@ -8,8 +8,10 @@ import {
   Input,
   Button,
   Alert,
+  Stack,
 } from "@mui/joy";
 import AuthLayout from "./AuthLayout";
+import MockMateIcon from "./MockMateIcon";
 
 interface RegisterPageProps {
   onRegisterSuccess: (username: string) => void;
@@ -70,26 +72,26 @@ export default function RegisterPage({ onRegisterSuccess, onSwitchToLogin }: Reg
     <AuthLayout>
       <Box
         sx={{
-          width: { xs: "100%", sm: 380 },
-          maxWidth: 380,
+          width: "100%",
           animation: "scaleIn 0.5s ease-out",
         }}
       >
         {/* Brand header — only visible on mobile */}
         <Box sx={{ display: { xs: "block", md: "none" }, textAlign: "center", mb: 4 }}>
-          <Typography
-            level="h2"
-            component="h1"
-            sx={{
-              fontSize: "2rem",
-              fontWeight: 700,
-              background: "linear-gradient(135deg, #2563eb, #172554)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            MockMate
-          </Typography>
+          <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
+            <MockMateIcon size={36} />
+            <Typography
+              level="h2"
+              component="h1"
+              sx={{
+                fontSize: "2rem",
+                fontWeight: 700,
+                color: "neutral.900",
+              }}
+            >
+              MockMate
+            </Typography>
+          </Stack>
           <Typography level="body-sm" sx={{ color: "neutral.500" }}>
             Your AI Interview Coach
           </Typography>

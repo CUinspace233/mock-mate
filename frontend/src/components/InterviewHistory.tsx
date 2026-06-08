@@ -133,16 +133,16 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
     return Math.round(recentAvg - olderAvg);
   };
 
-  const statCardSx = (accentColor: string, delay: number) => ({
+  const statCardSx = (_accentColor: string, delay: number) => ({
     flex: 1,
-    borderLeft: `4px solid`,
-    borderLeftColor: accentColor,
-    boxShadow: "sm",
+    border: "1px solid",
+    borderColor: "neutral.200",
+    boxShadow: "none",
     animation: `slideUp 0.4s ease-out ${delay * 0.1}s both`,
   });
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: { xs: 0.5, sm: 1 }, maxWidth: 1120, mx: "auto" }}>
       {/* Statistics Cards */}
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 3 }}>
         <Card sx={statCardSx("primary.500", 0)}>
@@ -204,7 +204,7 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
       </Stack>
 
       {/* Filter and Actions */}
-      <Card variant="outlined" sx={{ mb: 3, boxShadow: "sm" }}>
+      <Card variant="outlined" sx={{ mb: 3, boxShadow: "none", borderColor: "neutral.200" }}>
         <CardContent>
           <Stack
             direction={{ xs: "column", sm: "row" }}
@@ -261,7 +261,10 @@ export default function InterviewHistory({ selectedPosition }: InterviewHistoryP
           </Typography>
         </Box>
       ) : (
-        <Card variant="outlined" sx={{ borderRadius: "lg", overflow: "auto", boxShadow: "sm" }}>
+        <Card
+          variant="outlined"
+          sx={{ borderRadius: "lg", overflow: "auto", boxShadow: "none", borderColor: "neutral.200" }}
+        >
           <Table
             sx={{
               "& tbody tr:nth-of-type(even)": {

@@ -1,5 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { Modal, ModalDialog, ModalClose, Box, Typography, Alert, Stack, Button } from "@mui/joy";
+import {
+  Modal,
+  ModalDialog,
+  ModalClose,
+  Box,
+  Typography,
+  Alert,
+  Stack,
+  Button,
+  Tooltip,
+} from "@mui/joy";
 import { Newspaper } from "@mui/icons-material";
 import NewsQuestionCard from "./NewsQuestionCard";
 import { NewsQuestionPushService } from "../services/newsQuestionPushService";
@@ -13,6 +23,7 @@ interface NewsQuestionPushProps {
   isInterviewActive: boolean;
   openaiApiKey: string;
   openaiModel: string;
+  compact?: boolean;
 }
 
 export default function NewsQuestionPush({
@@ -22,6 +33,7 @@ export default function NewsQuestionPush({
   isInterviewActive,
   openaiApiKey,
   openaiModel,
+  compact = false,
 }: NewsQuestionPushProps) {
   const [currentQuestion, setCurrentQuestion] = useState<NewsQuestion | null>(null);
   const [showPushModal, setShowPushModal] = useState(false);
@@ -145,26 +157,43 @@ export default function NewsQuestionPush({
     }
   };
 
-  const ManualFetchButton = () => (
-    <Button
-      variant="outlined"
-      color="primary"
-      size="sm"
-      onClick={handleManualFetch}
-      loading={isLoadingManual}
-      startDecorator={!isLoadingManual && <Newspaper />}
-      sx={{
-        flex: { xs: 1, sm: "none" },
-        minWidth: { sm: 140 },
-      }}
-    >
-      {isLoadingManual ? "Fetching..." : "Daily Trending Question"}
-    </Button>
-  );
+  const ManualFetchButton = () => {
+    const button = (
+      <Button
+        variant="outlined"
+        color="primary"
+        size="sm"
+        onClick={handleManualFetch}
+        loading={isLoadingManual}
+        startDecorator={!compact && !isLoadingManual && <Newspaper />}
+        aria-label={compact ? "Daily Trending Question" : undefined}
+        sx={{
+          width: compact ? 44 : "100%",
+          minWidth: compact ? 44 : 0,
+          px: compact ? 0 : undefined,
+          justifyContent: "center",
+        }}
+      >
+        {compact
+          ? !isLoadingManual && <Newspaper fontSize="small" />
+          : isLoadingManual
+            ? "Fetching..."
+            : "Daily Trending Question"}
+      </Button>
+    );
+
+    return compact ? (
+      <Tooltip title="Daily Trending Question" placement="right">
+        {button}
+      </Tooltip>
+    ) : (
+      button
+    );
+  };
 
   return (
     <>
-      {ManualFetchButton()}
+      <Box sx={{ width: "100%" }}>{ManualFetchButton()}</Box>
 
       {/* Error Alert */}
       {error && (

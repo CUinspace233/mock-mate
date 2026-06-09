@@ -91,6 +91,7 @@ export async function generateQuestionStream(
 
       if (evt === "init" && payload.question_id && onInit) onInit(payload.question_id);
       if (evt === "content" && payload.delta) onDelta(payload.delta);
+      if (evt === "error" && payload.error) throw new Error(payload.error);
       if (evt === "final") final = payload as GenerateQuestionResponse;
     }
   }

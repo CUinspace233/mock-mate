@@ -38,6 +38,8 @@ export enum CreativityLevel {
   CREATIVE = "creative",
 }
 
+export type CodeQuestionMode = "mixed" | "include" | "exclude";
+
 export interface Message {
   id: string;
   sender: "ai" | "user";
@@ -64,6 +66,7 @@ export interface GenerateQuestionRequest {
   session_id?: string;
   creativity?: CreativityLevel;
   job_description?: string;
+  code_question_mode?: CodeQuestionMode;
 }
 
 export interface GenerateQuestionResponse {
@@ -107,6 +110,7 @@ export interface FollowUpRequest {
   session_id?: string;
   creativity?: CreativityLevel;
   job_description?: string;
+  code_question_mode?: CodeQuestionMode;
 }
 
 export interface FollowUpStreamResponse extends GenerateQuestionResponse {
@@ -339,7 +343,7 @@ export type NewsCategory = "ai" | "web_dev" | "mobile" | "devops" | "general_tec
 export interface RecoverableQuestion {
   question_id: string;
   content: string;
-  status: "generating" | "interrupted";
+  status: "generating" | "interrupted" | "completed";
   position: string;
   difficulty: string;
   question_type: string;

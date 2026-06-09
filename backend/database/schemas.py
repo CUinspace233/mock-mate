@@ -117,6 +117,7 @@ class GenerateQuestionRequest(BaseModel):
     session_id: str | None = None
     creativity: CreativityLevel = CreativityLevel.BALANCED
     job_description: str | None = None
+    code_question_mode: str = "mixed"
 
 
 class GenerateQuestionResponse(BaseModel):
@@ -167,6 +168,7 @@ class GenerateFollowUpRequest(BaseModel):
     session_id: str | None = None
     creativity: CreativityLevel = CreativityLevel.BALANCED
     job_description: str | None = None
+    code_question_mode: str = "mixed"
 
 
 class ResumeProject(BaseModel):

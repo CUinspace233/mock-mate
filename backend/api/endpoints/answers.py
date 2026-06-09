@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,6 +19,7 @@ from database.schemas import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 EVALUATION_TEXT_FORMAT = {
@@ -55,6 +57,66 @@ EVALUATION_TEXT_FORMAT = {
         },
     },
 }
+
+
+def _parse_evaluation_json(raw_text: str) -> dict:
+    evaluation = json.loads(raw_text or "{}")
+    if not isinstance(evaluation, dict):
+        raise ValueError("Evaluation response must be a JSON object")
+    return evaluation
+
+
+def _repair_evaluation_json(
+    client: OpenAI,
+    openai_model: str,
+    original_prompt: str,
+    malformed_json: str,
+    max_output_tokens: int,
+) -> dict:
+    """Ask the model to regenerate valid structured JSON after a malformed response."""
+    repair_prompt = f"""
+    The previous answer evaluation response was malformed or incomplete JSON.
+    Regenerate the evaluation as valid JSON that matches the required schema.
+
+    Original evaluation request:
+    {original_prompt}
+
+    Malformed JSON draft:
+    {malformed_json[:4000]}
+    """
+
+    response = client.responses.create(
+        model=openai_model,
+        instructions=(
+            "You repair malformed structured answer evaluations. Return one complete JSON object "
+            "that satisfies the provided schema. Do not include markdown or extra text."
+        ),
+        input=repair_prompt,
+        max_output_tokens=max_output_tokens,
+        temperature=0.1,
+        text=EVALUATION_TEXT_FORMAT,
+    )
+    return _parse_evaluation_json(response.output_text or "{}")
+
+
+def _parse_or_repair_evaluation_json(
+    client: OpenAI,
+    openai_model: str,
+    original_prompt: str,
+    raw_text: str,
+    max_output_tokens: int,
+) -> dict:
+    try:
+        return _parse_evaluation_json(raw_text)
+    except (json.JSONDecodeError, ValueError):
+        logger.warning("AI evaluation returned malformed JSON; requesting repair")
+        return _repair_evaluation_json(
+            client,
+            openai_model,
+            original_prompt,
+            raw_text,
+            max_output_tokens,
+        )
 
 
 def _job_description_prompt(job_description: str | None) -> str:
@@ -101,12 +163,18 @@ async def evaluate_answer_ai(
             model=openai_model,
             instructions="You are an expert technical interviewer. Evaluate answers objectively and provide constructive feedback.",
             input=prompt,
-            max_output_tokens=800,
+            max_output_tokens=2000,
             temperature=0.3,
             text=EVALUATION_TEXT_FORMAT,
         )
 
-        evaluation = json.loads(response.output_text or "{}")
+        evaluation = _parse_or_repair_evaluation_json(
+            client,
+            openai_model,
+            prompt,
+            response.output_text or "",
+            2000,
+        )
 
         evaluation_details = EvaluationDetails(
             technical_accuracy=min(max(float(evaluation["technical_accuracy"]), 0), 100),
@@ -126,9 +194,7 @@ async def evaluate_answer_ai(
         )
 
     except Exception as e:
-        import traceback
-
-        print(f"AI evaluation failed: {e}\n{traceback.format_exc()}")
+        logger.exception("AI evaluation failed")
         return evaluate_answer_mock(question_content, answer, expected_keywords)
 
 
@@ -317,12 +383,18 @@ async def evaluate_followup_ai(
                 "falter under probing? Provide constructive feedback."
             ),
             input=prompt,
-            max_output_tokens=800,
+            max_output_tokens=2400,
             temperature=0.3,
             text=EVALUATION_TEXT_FORMAT,
         )
 
-        evaluation = json.loads(response.output_text or "{}")
+        evaluation = _parse_or_repair_evaluation_json(
+            client,
+            openai_model,
+            prompt,
+            response.output_text or "",
+            2400,
+        )
 
         evaluation_details = EvaluationDetails(
             technical_accuracy=min(max(float(evaluation["technical_accuracy"]), 0), 100),
@@ -342,10 +414,7 @@ async def evaluate_followup_ai(
         )
 
     except Exception as e:
-        import traceback
-
-        print(f"AI follow-up evaluation failed: {e}\n{traceback.format_exc()}")
-        # Fallback: concatenate all candidate answers and use mock evaluation
+        logger.exception("AI follow-up evaluation failed")
         all_answers = " ".join(
             entry["content"] for entry in conversation_history if entry["role"] == "candidate"
         )

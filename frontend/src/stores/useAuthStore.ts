@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { encryptApiKey, decryptApiKey } from "../crypto";
-import { CreativityLevel, Difficulty } from "../types/interview";
+import { CreativityLevel, Difficulty, type CodeQuestionMode } from "../types/interview";
 
 type AuthState = {
   isLoggedIn: boolean;
@@ -22,6 +22,8 @@ type AuthState = {
   setOpenaiModel: (model: string) => void;
   questionCreativity: CreativityLevel;
   setQuestionCreativity: (creativity: CreativityLevel) => void;
+  codeQuestionMode: CodeQuestionMode;
+  setCodeQuestionMode: (mode: CodeQuestionMode) => void;
   openaiApiKey: string; // stored encrypted
   setOpenaiApiKey: (apiKey: string) => void;
   getDecryptedApiKey: () => Promise<string>;
@@ -59,6 +61,8 @@ export const useAuthStore = create<AuthState>()(
       setOpenaiModel: (model) => set({ openaiModel: model }),
       questionCreativity: CreativityLevel.BALANCED,
       setQuestionCreativity: (creativity) => set({ questionCreativity: creativity }),
+      codeQuestionMode: "mixed",
+      setCodeQuestionMode: (mode) => set({ codeQuestionMode: mode }),
       openaiApiKey: "",
       setOpenaiApiKey: (apiKey) => {
         const ver = ++encryptVersion;
@@ -107,6 +111,7 @@ export const useAuthStore = create<AuthState>()(
         language: state.language,
         openaiModel: state.openaiModel,
         questionCreativity: state.questionCreativity,
+        codeQuestionMode: state.codeQuestionMode,
         openaiApiKey: state.openaiApiKey,
       }),
     },

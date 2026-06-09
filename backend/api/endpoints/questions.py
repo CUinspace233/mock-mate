@@ -77,12 +77,6 @@ def _single_interview_question(text: str) -> str:
         if cleaned.startswith(prefix):
             cleaned = cleaned[len(prefix) :].strip()
 
-    question_marks = [mark for mark in ("?", "？") if mark in cleaned]
-    if question_marks:
-        first_positions = [cleaned.find(mark) for mark in question_marks if cleaned.find(mark) >= 0]
-        cutoff = min(first_positions)
-        cleaned = cleaned[: cutoff + 1].strip()
-
     return cleaned
 
 
@@ -112,6 +106,26 @@ def _job_description_prompt(job_description: str | None) -> str:
         f"{jd[:6000]}\n\n"
         "Use this JD to tailor the interview question to the role's responsibilities, tech stack, "
         "business context, seniority, and required skills. Do not quote the JD verbatim unless needed."
+    )
+
+
+def _code_question_prompt(code_question_mode: str | None) -> str:
+    mode = (code_question_mode or "mixed").strip().lower()
+    if mode == "include":
+        return (
+            " Include a coding or code-reading element when it fits the role and question type. "
+            "The question may ask the candidate to reason about a short snippet, write concise code, "
+            "identify a bug, analyze complexity, or explain an API behavior through code. Keep it "
+            "interview-sized and do not require a full project implementation."
+        )
+    if mode == "exclude":
+        return (
+            " Do NOT generate a coding exercise, code-writing task, or code-reading snippet. "
+            "Ask a conceptual, design, debugging, tradeoff, or practical knowledge question instead."
+        )
+    return (
+        " Coding or code-reading content is optional; include it only if it naturally improves the "
+        "interview question."
     )
 
 
@@ -201,13 +215,13 @@ def _run_openai_stream_in_thread(
                 final_response = stream.get_final_response()
                 response_id = final_response.id
             except Exception as final_error:
-                if not content.strip():
-                    raise
                 logger.warning(
-                    "OpenAI stream ended without final response event; using streamed content. Error: %s",
+                    "OpenAI stream ended without final response event; discarding partial content. Error: %s",
                     final_error,
                 )
-                response_id = ""
+                raise RuntimeError(
+                    "OpenAI stream ended before the response completed"
+                ) from final_error
         state.mark_done(_single_interview_question(content), response_id)
     except Exception as e:
         logger.exception("OpenAI stream error")
@@ -299,6 +313,7 @@ async def generate_ai_question(
     openai_model: str = "gpt-5.4-mini",
     creativity: CreativityLevel = CreativityLevel.BALANCED,
     job_description: str | None = None,
+    code_question_mode: str = "mixed",
 ) -> GeneratedQuestion:
     """Generate a question using AI (OpenAI GPT)"""
     client = _get_client(openai_api_key)
@@ -307,6 +322,7 @@ async def generate_ai_question(
         "The question must be specific and knowledge-based — test a concrete concept, principle, API, "
         "algorithm, or technical detail. Do NOT ask broad or open-ended questions like 'Tell me about...' "
         "or 'Describe your experience with...'. Return only the question."
+        + _code_question_prompt(code_question_mode)
         + _job_description_prompt(job_description)
         + _lang_prompt(language)
     )
@@ -318,7 +334,7 @@ async def generate_ai_question(
             "You are an expert interview question generator." + _lang_system(language)
         ),
         "input": prompt,
-        "max_output_tokens": 100,
+        "max_output_tokens": 500,
         "temperature": temperature,
     }
     if top_p is not None:
@@ -357,6 +373,7 @@ async def generate_question_stream(
             f"Generate a {req.difficulty} level {req.question_type} interview question for a {req.position} position. "
             "This is the final question — it can be a broader, open-ended question that tests the candidate's "
             "overall understanding, design thinking, or practical experience. Return only the question."
+            + _code_question_prompt(req.code_question_mode)
             + _job_description_prompt(req.job_description)
             + lang_p
         )
@@ -366,6 +383,7 @@ async def generate_question_stream(
             "The question must be specific and knowledge-based — test a concrete concept, principle, API, "
             "algorithm, or technical detail. Do NOT ask broad or open-ended questions like 'Tell me about...' "
             "or 'Describe your experience with...'. Return only the question."
+            + _code_question_prompt(req.code_question_mode)
             + _job_description_prompt(req.job_description)
             + lang_p
         )
@@ -403,7 +421,7 @@ async def generate_question_stream(
             req.openai_model,
             instructions,
             prompt,
-            100,
+            500,
             *_sampling_for(req.creativity),
             state,
         ),
@@ -473,6 +491,7 @@ async def generate_followup_stream(
         "that digs deeper into their understanding. The follow-up must be specific and knowledge-based — "
         "ask about a concrete concept, mechanism, or technical detail related to their answer. "
         "Return only the follow-up question."
+        + _code_question_prompt(req.code_question_mode)
         + _job_description_prompt(req.job_description)
         + _lang_prompt(req.language)
     )
@@ -809,6 +828,7 @@ async def generate_question(
             request.openai_model,
             request.creativity,
             request.job_description,
+            request.code_question_mode,
         )
 
         question = models.Question(

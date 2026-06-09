@@ -23,6 +23,7 @@ import {
 } from "@mui/icons-material";
 import {
   CreativityLevel,
+  type CodeQuestionMode,
   Difficulty,
   JOB_POSITION_OPTIONS,
   QuestionType,
@@ -46,6 +47,8 @@ interface PracticeSetupPanelProps {
   onLanguageChange: (language: string) => void;
   questionCreativity: CreativityLevel;
   onQuestionCreativityChange: (creativity: CreativityLevel) => void;
+  codeQuestionMode: CodeQuestionMode;
+  onCodeQuestionModeChange: (mode: CodeQuestionMode) => void;
   openaiModel: string;
   onOpenaiModelChange: (model: string) => void;
   availableModels: string[];
@@ -71,6 +74,12 @@ const languageLabels: Record<string, string> = {
   ko: "한국어",
 };
 
+const codeQuestionModeLabels: Record<CodeQuestionMode, string> = {
+  mixed: "code optional",
+  include: "include code",
+  exclude: "no code",
+};
+
 function fieldLabel(label: string) {
   return (
     <Typography level="body-xs" sx={{ color: "neutral.500", fontWeight: 700 }}>
@@ -94,6 +103,8 @@ export default function PracticeSetupPanel({
   onLanguageChange,
   questionCreativity,
   onQuestionCreativityChange,
+  codeQuestionMode,
+  onCodeQuestionModeChange,
   openaiModel,
   onOpenaiModelChange,
   availableModels,
@@ -182,6 +193,9 @@ export default function PracticeSetupPanel({
               </Chip>
               <Chip size="sm" variant="soft" color="neutral">
                 {followUpLimit ? `${followUpLimit} follow-ups` : "follow-ups off"}
+              </Chip>
+              <Chip size="sm" variant="soft" color="neutral">
+                {codeQuestionModeLabels[codeQuestionMode]}
               </Chip>
             </>
           )}
@@ -357,6 +371,21 @@ export default function PracticeSetupPanel({
                     <Option value={3}>3</Option>
                     <Option value={4}>4</Option>
                     <Option value={5}>5</Option>
+                  </Select>
+                </Stack>
+              )}
+
+              {mode === "chat" && (
+                <Stack spacing={0.5}>
+                  {fieldLabel("Code questions")}
+                  <Select
+                    size="sm"
+                    value={codeQuestionMode}
+                    onChange={(_, value) => value && onCodeQuestionModeChange(value as CodeQuestionMode)}
+                  >
+                    <Option value="mixed">Mixed</Option>
+                    <Option value="include">Include code</Option>
+                    <Option value="exclude">No code</Option>
                   </Select>
                 </Stack>
               )}

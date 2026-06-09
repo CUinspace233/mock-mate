@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import { Box, Drawer, IconButton, Sheet, Stack, Typography } from "@mui/joy";
 import { Menu as MenuIcon } from "@mui/icons-material";
 import SidebarNav from "./SidebarNav";
@@ -9,6 +10,7 @@ interface AppShellProps {
   dailyQuestionCount: number;
   onLogout: () => void;
   children: React.ReactNode;
+  renderSidebarAction?: (collapsed: boolean) => React.ReactNode;
 }
 
 const routeTitles: Record<string, string> = {
@@ -23,10 +25,12 @@ export default function AppShell({
   dailyQuestionCount,
   onLogout,
   children,
+  renderSidebarAction,
 }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const location = useLocation();
+  const isDesktop = useMediaQuery("(min-width:900px)");
   const title = routeTitles[location.pathname] || "Interview Chat";
 
   const nav = (
@@ -37,6 +41,7 @@ export default function AppShell({
       onNavigate={() => setDrawerOpen(false)}
       collapsed={sidebarCollapsed}
       onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
+      sidebarAction={isDesktop ? renderSidebarAction?.(sidebarCollapsed) : undefined}
     />
   );
 
@@ -46,6 +51,7 @@ export default function AppShell({
       dailyQuestionCount={dailyQuestionCount}
       onLogout={onLogout}
       onNavigate={() => setDrawerOpen(false)}
+      sidebarAction={!isDesktop ? renderSidebarAction?.(false) : undefined}
     />
   );
 

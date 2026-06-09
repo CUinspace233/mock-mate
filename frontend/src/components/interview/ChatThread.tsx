@@ -32,7 +32,7 @@ export default function ChatThread({
         pb: 3,
       }}
     >
-      <Stack spacing={2.25} sx={{ maxWidth: 860, mx: "auto", py: 2 }}>
+      <Stack spacing={2.25} sx={{ maxWidth: 860, mx: "auto", width: "100%", py: 2 }}>
         {currentQuestionNumber > 0 && (
           <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
             <Chip size="sm" variant="soft" color="primary">

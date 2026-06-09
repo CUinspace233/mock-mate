@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-  Box,
-} from "@mui/joy";
+import { Box } from "@mui/joy";
 import InterviewChat from "./InterviewChat.tsx";
 import InterviewHistory from "./InterviewHistory.tsx";
 import ProgressChart from "./ProgressChart.tsx";
@@ -14,9 +12,7 @@ import {
   recoverQuestions,
 } from "../api/api";
 import type { Message } from "../types/interview.ts";
-import {
-  QuestionType,
-} from "../types/interview";
+import { QuestionType } from "../types/interview";
 import NewsQuestionPush from "./NewsQuestionPush.tsx";
 import type { NewsQuestion } from "../types/interview.ts";
 import { useAuthStore } from "../stores/useAuthStore.ts";
@@ -30,6 +26,30 @@ interface InterviewTrainingProps {
   username: string;
   onLogout: () => void;
 }
+
+type PersistedMessage = Omit<Message, "timestamp"> & { timestamp: string };
+
+type InterviewChatDraft = {
+  sessionId: string | null;
+  messages: PersistedMessage[];
+  currentQuestion: PersistedMessage | null;
+  currentQuestionNumber: number;
+  awaitingAnswer: boolean;
+  interviewStarted: boolean;
+  isRecoveredSession: boolean;
+};
+
+const chatDraftKey = (userId: number) => `interview-chat-draft:${userId}`;
+
+const serializeMessage = (message: Message): PersistedMessage => ({
+  ...message,
+  timestamp: message.timestamp.toISOString(),
+});
+
+const deserializeMessage = (message: PersistedMessage): Message => ({
+  ...message,
+  timestamp: new Date(message.timestamp),
+});
 
 export default function InterviewTraining({ username, onLogout }: InterviewTrainingProps) {
   const location = useLocation();
@@ -56,6 +76,8 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const setOpenaiModel = useAuthStore((state) => state.setOpenaiModel);
   const questionCreativity = useAuthStore((state) => state.questionCreativity);
   const setQuestionCreativity = useAuthStore((state) => state.setQuestionCreativity);
+  const codeQuestionMode = useAuthStore((state) => state.codeQuestionMode);
+  const setCodeQuestionMode = useAuthStore((state) => state.setCodeQuestionMode);
   const encryptedApiKey = useAuthStore((state) => state.openaiApiKey);
   const setOpenaiApiKey = useAuthStore((state) => state.setOpenaiApiKey);
   const [displayApiKey, setDisplayApiKey] = useState("");
@@ -105,6 +127,8 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
   const [currentQuestion, setCurrentQuestion] = useState<Message | null>(null);
   const [awaitingAnswer, setAwaitingAnswer] = useState(false);
   const [jobDescription, setJobDescription] = useState("");
+  const [hasRestoredChatDraft, setHasRestoredChatDraft] = useState(false);
+  const [isRestoringChatDraft, setIsRestoringChatDraft] = useState(false);
 
   const handleQuestionNumberIncrement = useCallback(
     () => setCurrentQuestionNumber((n) => n + 1),
@@ -126,13 +150,34 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
       setDailyQuestionCount(0);
       setDailyQuestionDate(today);
     }
-    if (sessionId && !interviewStarted) {
+    if (sessionId && !interviewStarted && !hasRestoredChatDraft) {
       // Try to recover the session instead of completing it
+      setIsRestoringChatDraft(true);
       (async () => {
         try {
           const detail = await getSessionDetail(sessionId);
           if (detail.status === "active") {
-            // Session is still active — recover completed questions
+            const rawDraft = user_id ? localStorage.getItem(chatDraftKey(user_id)) : null;
+            if (rawDraft) {
+              const draft = JSON.parse(rawDraft) as InterviewChatDraft;
+              const hasUsableDraft =
+                draft.sessionId === sessionId &&
+                (draft.messages.length > 0 || draft.currentQuestion !== null);
+              if (hasUsableDraft) {
+                setMessages(draft.messages.map(deserializeMessage));
+                setCurrentQuestion(
+                  draft.currentQuestion ? deserializeMessage(draft.currentQuestion) : null,
+                );
+                setCurrentQuestionNumber(draft.currentQuestionNumber);
+                setAwaitingAnswer(draft.awaitingAnswer);
+                setIsRecoveredSession(draft.isRecoveredSession || true);
+                setInterviewStarted(draft.interviewStarted || true);
+                return;
+              }
+            }
+
+            // Session is still active, but local UI draft is missing. Recover questions
+            // from the backend and continue from the latest generated question.
             const recovered = await recoverQuestions(sessionId, true);
             const questionsWithContent = recovered.filter((q) => q.content);
             const restoredMessages: Message[] = questionsWithContent.map((q) => ({
@@ -141,26 +186,70 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
               content: q.content,
               timestamp: new Date(q.created_at),
             }));
+            const latestQuestion = restoredMessages[restoredMessages.length - 1] ?? null;
             setMessages(restoredMessages);
+            setCurrentQuestion(latestQuestion);
             setCurrentQuestionNumber(questionsWithContent.length);
+            setAwaitingAnswer(!!latestQuestion);
             setIsRecoveredSession(true);
             setInterviewStarted(true);
           } else {
             // Session already completed — clear stale sessionId
+            if (user_id) localStorage.removeItem(chatDraftKey(user_id));
             setSessionId(null);
           }
         } catch {
           // Session not found or error — clear stale sessionId
+          if (user_id) localStorage.removeItem(chatDraftKey(user_id));
           setSessionId(null);
+        } finally {
+          setHasRestoredChatDraft(true);
+          setIsRestoringChatDraft(false);
         }
       })();
     }
     // eslint-disable-next-line
-  }, [username, user_id]);
+  }, [username, user_id, sessionId, interviewStarted, hasRestoredChatDraft]);
+
+  useEffect(() => {
+    if (!user_id) return;
+
+    if (isRestoringChatDraft || (sessionId && !interviewStarted && !hasRestoredChatDraft)) {
+      return;
+    }
+
+    if (!sessionId && !interviewStarted && messages.length === 0) {
+      localStorage.removeItem(chatDraftKey(user_id));
+      return;
+    }
+
+    const draft: InterviewChatDraft = {
+      sessionId,
+      messages: messages.map(serializeMessage),
+      currentQuestion: currentQuestion ? serializeMessage(currentQuestion) : null,
+      currentQuestionNumber,
+      awaitingAnswer,
+      interviewStarted,
+      isRecoveredSession,
+    };
+    localStorage.setItem(chatDraftKey(user_id), JSON.stringify(draft));
+  }, [
+    awaitingAnswer,
+    currentQuestion,
+    currentQuestionNumber,
+    hasRestoredChatDraft,
+    interviewStarted,
+    isRestoringChatDraft,
+    isRecoveredSession,
+    messages,
+    sessionId,
+    user_id,
+  ]);
 
   const handlePositionChange = (position: string) => {
     setSelectedPosition(position);
     setInterviewStarted(false);
+    if (user_id) localStorage.removeItem(chatDraftKey(user_id));
   };
 
   const handleStartInterview = async () => {
@@ -172,6 +261,10 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
       setSessionId(res.session_id);
       setIsRecoveredSession(false);
       setInterviewStarted(true);
+      setMessages([]);
+      setCurrentQuestion(null);
+      setAwaitingAnswer(false);
+      setCurrentQuestionNumber(0);
     } catch (err) {
       console.error(err);
     }
@@ -199,6 +292,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
     setCurrentQuestionNumber(0);
     setJobDescription("");
     setSessionId(null);
+    if (user_id) localStorage.removeItem(chatDraftKey(user_id));
   };
 
   const handleStartInterviewWithNews = async (newsQuestion?: NewsQuestion) => {
@@ -208,7 +302,12 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
         position: selectedPosition,
       });
       setSessionId(res.session_id);
+      setIsRecoveredSession(false);
       setInterviewStarted(true);
+      setMessages([]);
+      setCurrentQuestion(null);
+      setAwaitingAnswer(false);
+      setCurrentQuestionNumber(0);
 
       if (newsQuestion) {
         setPendingNewsQuestion(newsQuestion);
@@ -227,26 +326,29 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
     "idle",
   );
 
-  const parseModels = useCallback((data: { data: { id: string }[] }) => {
-    // Only keep modern GPT families (Responses API compatible)
-    // Exclude fine-tune snapshots (contain ":"), old gpt-3.5/gpt-4-* legacy, and non-chat models
-    const ALLOWED_PREFIXES = ["gpt-5", "gpt-4.1", "gpt-4o", "gpt-4.5", "gpt-4-turbo"];
-    const EXCLUDED_KEYWORDS = ["tts", "transcribe", "audio", "realtime", "search"];
-    const models = data.data
-      .map((m) => m.id)
-      .filter(
-        (id) =>
-          ALLOWED_PREFIXES.some((prefix) => id.startsWith(prefix)) &&
-          !id.includes(":") &&
-          !EXCLUDED_KEYWORDS.some((kw) => id.includes(kw)),
-      )
-      .sort((a, b) => b.localeCompare(a)); // reverse alpha: newest (4.5, 4.1) first
-    setAvailableModels(models);
-    const firstModel = models[0];
-    if (firstModel && !models.includes(openaiModel)) {
-      setOpenaiModel(firstModel);
-    }
-  }, [openaiModel, setOpenaiModel]);
+  const parseModels = useCallback(
+    (data: { data: { id: string }[] }) => {
+      // Only keep modern GPT families (Responses API compatible)
+      // Exclude fine-tune snapshots (contain ":"), old gpt-3.5/gpt-4-* legacy, and non-chat models
+      const ALLOWED_PREFIXES = ["gpt-5", "gpt-4.1", "gpt-4o", "gpt-4.5", "gpt-4-turbo"];
+      const EXCLUDED_KEYWORDS = ["tts", "transcribe", "audio", "realtime", "search"];
+      const models = data.data
+        .map((m) => m.id)
+        .filter(
+          (id) =>
+            ALLOWED_PREFIXES.some((prefix) => id.startsWith(prefix)) &&
+            !id.includes(":") &&
+            !EXCLUDED_KEYWORDS.some((kw) => id.includes(kw)),
+        )
+        .sort((a, b) => b.localeCompare(a)); // reverse alpha: newest (4.5, 4.1) first
+      setAvailableModels(models);
+      const firstModel = models[0];
+      if (firstModel && !models.includes(openaiModel)) {
+        setOpenaiModel(firstModel);
+      }
+    },
+    [openaiModel, setOpenaiModel],
+  );
 
   const fetchModels = useCallback(
     async (key: string) => {
@@ -349,6 +451,8 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
       onLanguageChange={setLanguage}
       questionCreativity={questionCreativity}
       onQuestionCreativityChange={setQuestionCreativity}
+      codeQuestionMode={codeQuestionMode}
+      onCodeQuestionModeChange={setCodeQuestionMode}
       openaiModel={openaiModel}
       onOpenaiModelChange={setOpenaiModel}
       availableModels={availableModels}
@@ -373,54 +477,38 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
         }}
       >
         {setupPanel}
-        <Box sx={{ mb: 1.5 }}>
-          <NewsQuestionPush
-            userId={user_id || 0}
-            selectedPosition={selectedPosition}
-            onStartAnswering={(_, newsQuestion) => {
-              navigate("/chat");
-              if (!interviewStarted) {
-                handleStartInterviewWithNews(newsQuestion);
-              } else {
-                setPendingNewsQuestion(newsQuestion);
-              }
-            }}
-            isInterviewActive={interviewStarted}
-            openaiApiKey={displayApiKey}
-            openaiModel={openaiModel}
-          />
-        </Box>
       </Box>
       <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         <InterviewChat
-        selectedPosition={selectedPosition}
-        selectedDifficulty={selectedDifficulty}
-        user_id={user_id || 0}
-        interviewStarted={interviewStarted}
-        isRecoveredSession={isRecoveredSession}
-        sessionId={sessionId}
-        onInterviewComplete={handleInterviewComplete}
-        onInterviewStart={handleStartInterview}
-        messages={messages}
-        setMessages={setMessages}
-        currentQuestion={currentQuestion}
-        setCurrentQuestion={setCurrentQuestion}
-        awaitingAnswer={awaitingAnswer}
-        setAwaitingAnswer={setAwaitingAnswer}
-        presetQuestion={pendingNewsQuestion}
-        onPresetQuestionUsed={handleNewsQuestionUsed}
-        questionType={selectedQuestionType}
-        openaiApiKey={displayApiKey}
-        questionCountTarget={questionCountTarget}
-        currentQuestionNumber={currentQuestionNumber}
-        onQuestionNumberIncrement={handleQuestionNumberIncrement}
-        followUpLimit={followUpLimit}
-        language={language}
-        openaiModel={openaiModel}
-        questionCreativity={questionCreativity}
-        jobDescription={jobDescription}
-        setJobDescription={setJobDescription}
-      />
+          selectedPosition={selectedPosition}
+          selectedDifficulty={selectedDifficulty}
+          user_id={user_id || 0}
+          interviewStarted={interviewStarted}
+          isRecoveredSession={isRecoveredSession}
+          sessionId={sessionId}
+          onInterviewComplete={handleInterviewComplete}
+          onInterviewStart={handleStartInterview}
+          messages={messages}
+          setMessages={setMessages}
+          currentQuestion={currentQuestion}
+          setCurrentQuestion={setCurrentQuestion}
+          awaitingAnswer={awaitingAnswer}
+          setAwaitingAnswer={setAwaitingAnswer}
+          presetQuestion={pendingNewsQuestion}
+          onPresetQuestionUsed={handleNewsQuestionUsed}
+          questionType={selectedQuestionType}
+          openaiApiKey={displayApiKey}
+          questionCountTarget={questionCountTarget}
+          currentQuestionNumber={currentQuestionNumber}
+          onQuestionNumberIncrement={handleQuestionNumberIncrement}
+          followUpLimit={followUpLimit}
+          language={language}
+          openaiModel={openaiModel}
+          questionCreativity={questionCreativity}
+          codeQuestionMode={codeQuestionMode}
+          jobDescription={jobDescription}
+          setJobDescription={setJobDescription}
+        />
       </Box>
     </Box>
   );
@@ -430,6 +518,24 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
       username={username}
       dailyQuestionCount={dailyQuestionCount}
       onLogout={onLogout}
+      renderSidebarAction={(collapsed) => (
+        <NewsQuestionPush
+          userId={user_id || 0}
+          selectedPosition={selectedPosition}
+          onStartAnswering={(_, newsQuestion) => {
+            navigate("/chat");
+            if (!interviewStarted) {
+              handleStartInterviewWithNews(newsQuestion);
+            } else {
+              setPendingNewsQuestion(newsQuestion);
+            }
+          }}
+          isInterviewActive={interviewStarted}
+          openaiApiKey={displayApiKey}
+          openaiModel={openaiModel}
+          compact={collapsed}
+        />
+      )}
     >
       {location.pathname === "/resume-drill" ? (
         <WorkspaceMain variant="fluid">

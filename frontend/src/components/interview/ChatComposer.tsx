@@ -38,6 +38,7 @@ export default function ChatComposer({
       sx={{
         maxWidth: 860,
         mx: "auto",
+        width: "100%",
         p: 1,
         bgcolor: "background.surface",
         border: "1px solid",

@@ -30,6 +30,7 @@ interface SidebarNavProps {
   onNavigate?: () => void;
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
+  sidebarAction?: React.ReactNode;
 }
 
 const navItems = [
@@ -46,12 +47,17 @@ export default function SidebarNav({
   onNavigate,
   collapsed = false,
   onToggleCollapsed,
+  sidebarAction,
 }: SidebarNavProps) {
   const [userMenuAnchor, setUserMenuAnchor] = useState<HTMLElement | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const handleSidebarControl = onToggleCollapsed ?? onNavigate;
-  const sidebarControlTitle = collapsed ? "Open sidebar" : onToggleCollapsed ? "Close sidebar" : "Close menu";
+  const sidebarControlTitle = collapsed
+    ? "Open sidebar"
+    : onToggleCollapsed
+      ? "Close sidebar"
+      : "Close menu";
   const isUserMenuOpen = Boolean(userMenuAnchor);
 
   useEffect(() => {
@@ -169,47 +175,48 @@ export default function SidebarNav({
 
       <Stack spacing={0.5} sx={{ mt: 1, alignItems: collapsed ? "center" : "stretch" }}>
         {navItems.map((item) => {
-          const active = location.pathname === item.path || (location.pathname === "/" && item.path === "/chat");
+          const active =
+            location.pathname === item.path || (location.pathname === "/" && item.path === "/chat");
           const button = (
             <Box
-                key={item.path}
-                component="button"
-                type="button"
-                onClick={() => {
-                  navigate(item.path);
-                  onNavigate?.();
-                }}
-                sx={{
-                  width: collapsed ? 44 : "100%",
-                  minHeight: 44,
-                  border: "1px solid",
-                  borderColor: active ? "neutral.200" : "transparent",
-                  bgcolor: active ? "background.surface" : "transparent",
-                  color: active ? "neutral.900" : "neutral.700",
-                  borderRadius: "sm",
-                  px: collapsed ? 0 : 1.25,
-                  py: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: collapsed ? "center" : "flex-start",
-                  gap: 1,
-                  font: "inherit",
-                  fontWeight: active ? 700 : 500,
-                  textAlign: "left",
-                  cursor: "pointer",
-                  boxShadow: active ? "xs" : "none",
-                  "& svg": { fontSize: 20, color: active ? "primary.500" : "neutral.500" },
-                  "& img": { opacity: active ? 1 : 0.72 },
-                  "&:hover": { bgcolor: active ? "background.surface" : "neutral.100" },
-                }}
-              >
-                {item.icon}
-                {!collapsed && (
-                  <Typography level="body-sm" sx={{ fontWeight: "inherit" }}>
-                    {item.label}
-                  </Typography>
-                )}
-              </Box>
+              key={item.path}
+              component="button"
+              type="button"
+              onClick={() => {
+                navigate(item.path);
+                onNavigate?.();
+              }}
+              sx={{
+                width: collapsed ? 44 : "100%",
+                minHeight: 44,
+                border: "1px solid",
+                borderColor: active ? "neutral.200" : "transparent",
+                bgcolor: active ? "background.surface" : "transparent",
+                color: active ? "neutral.900" : "neutral.700",
+                borderRadius: "sm",
+                px: collapsed ? 0 : 1.25,
+                py: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: collapsed ? "center" : "flex-start",
+                gap: 1,
+                font: "inherit",
+                fontWeight: active ? 700 : 500,
+                textAlign: "left",
+                cursor: "pointer",
+                boxShadow: active ? "xs" : "none",
+                "& svg": { fontSize: 20, color: active ? "primary.500" : "neutral.500" },
+                "& img": { opacity: active ? 1 : 0.72 },
+                "&:hover": { bgcolor: active ? "background.surface" : "neutral.100" },
+              }}
+            >
+              {item.icon}
+              {!collapsed && (
+                <Typography level="body-sm" sx={{ fontWeight: "inherit" }}>
+                  {item.label}
+                </Typography>
+              )}
+            </Box>
           );
           return collapsed ? (
             <Tooltip key={item.path} title={item.label} placement="right">
@@ -220,6 +227,17 @@ export default function SidebarNav({
           );
         })}
       </Stack>
+
+      {sidebarAction && (
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: collapsed ? "center" : "stretch",
+          }}
+        >
+          {sidebarAction}
+        </Box>
+      )}
 
       <Divider sx={{ my: 0.5 }} />
 

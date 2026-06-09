@@ -27,6 +27,7 @@ import {
   type GenerateQuestionRequest,
   type ConversationEntry,
   CreativityLevel,
+  type CodeQuestionMode,
   Difficulty,
   type Message,
   type NewsQuestion,
@@ -64,6 +65,7 @@ interface InterviewChatProps {
   language: string;
   openaiModel: string;
   questionCreativity: CreativityLevel;
+  codeQuestionMode: CodeQuestionMode;
   jobDescription: string;
   setJobDescription: React.Dispatch<React.SetStateAction<string>>;
 }
@@ -94,6 +96,7 @@ export default function InterviewChat({
   language,
   openaiModel,
   questionCreativity,
+  codeQuestionMode,
   jobDescription,
 }: InterviewChatProps) {
   const [currentAnswer, setCurrentAnswer] = useState("");
@@ -171,6 +174,7 @@ export default function InterviewChat({
         openai_api_key: openaiApiKey,
         ...openaiModelPayload(openaiModel),
         creativity: questionCreativity,
+        code_question_mode: codeQuestionMode,
         is_last_question: currentQuestionNumber + 1 >= questionCountTarget,
         language,
         session_id: sessionIdRef.current || undefined,
@@ -259,6 +263,7 @@ export default function InterviewChat({
           openai_api_key: openaiApiKey,
           ...openaiModelPayload(openaiModel),
           creativity: questionCreativity,
+          code_question_mode: codeQuestionMode,
           is_last_question: currentQuestionNumber + 1 >= questionCountTarget,
           language,
           session_id: sessionIdRef.current || undefined,
@@ -342,6 +347,7 @@ export default function InterviewChat({
     openaiApiKey,
     openaiModel,
     questionCreativity,
+    codeQuestionMode,
     onQuestionNumberIncrement,
     followUpLimit,
     currentQuestionNumber,
@@ -544,6 +550,7 @@ export default function InterviewChat({
         openai_api_key: openaiApiKey,
         ...openaiModelPayload(openaiModel),
         creativity: questionCreativity,
+        code_question_mode: codeQuestionMode,
         language,
         session_id: sessionIdRef.current || undefined,
         ...jobDescriptionPayload,
@@ -672,7 +679,25 @@ export default function InterviewChat({
     return content;
   };
 
+  const hasRemainingQuestions = currentQuestionNumber < questionCountTarget;
+
   const handleStartNewQuestion = async () => {
+    if (!openaiApiKey.trim()) {
+      setError("Please enter your OpenAI API key in Setup before generating a question.");
+      return;
+    }
+
+    if (interviewStarted) {
+      if (!hasRemainingQuestions) {
+        setError("You've reached the configured question count. Complete the session to finish.");
+        return;
+      }
+
+      hasInitialized.current = true;
+      generateQuestion();
+      return;
+    }
+
     hasInitialized.current = true;
     await onInterviewStart();
     generateQuestion();
@@ -759,10 +784,6 @@ export default function InterviewChat({
               size="lg"
               startDecorator={isLoading ? undefined : <PlayArrowIcon />}
               onClick={() => {
-                if (!openaiApiKey.trim()) {
-                  setError("Please enter your OpenAI API key in Setup before starting an interview.");
-                  return;
-                }
                 handleStartNewQuestion();
               }}
               loading={isLoading}
@@ -822,9 +843,9 @@ export default function InterviewChat({
 
       <Box sx={{ position: "sticky", bottom: 0, px: { xs: 0.5, sm: 1 }, pb: 1.5, pt: 1 }}>
         {awaitingAnswer && currentQuestion ? (
-          <Stack spacing={1.5}>
+          <Stack spacing={1.5} sx={{ maxWidth: 860, mx: "auto", width: "100%" }}>
             {showAlert && (
-              <Alert color="primary" variant="soft" size="sm" sx={{ maxWidth: 860, mx: "auto", width: "100%" }}>
+              <Alert color="primary" variant="soft" size="sm" sx={{ width: "100%" }}>
                 Answer the question above, then send your response.
               </Alert>
             )}
@@ -871,11 +892,11 @@ export default function InterviewChat({
             <Button
               startDecorator={<RefreshIcon />}
               onClick={handleStartNewQuestion}
-              disabled={isLoading}
+              disabled={isLoading || !hasRemainingQuestions}
               variant="outlined"
               size="sm"
             >
-              New Question
+              {hasRemainingQuestions ? "Next Question" : "Question Limit Reached"}
             </Button>
             <Button
               startDecorator={isCompletingInterview ? undefined : <CheckIcon />}

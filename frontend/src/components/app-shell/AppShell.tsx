@@ -52,9 +52,10 @@ export default function AppShell({
   return (
     <Sheet
       sx={{
-        minHeight: "100dvh",
+        height: "100dvh",
         bgcolor: "background.body",
         display: "flex",
+        overflow: "hidden",
         color: "neutral.900",
       }}
     >
@@ -77,7 +78,17 @@ export default function AppShell({
         {drawerNav}
       </Drawer>
 
-      <Box sx={{ flex: 1, minWidth: 0, minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
+      <Box
+        sx={{
+          flex: 1,
+          minWidth: 0,
+          minHeight: 0,
+          height: "100dvh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
         <Stack
           direction="row"
           alignItems="center"

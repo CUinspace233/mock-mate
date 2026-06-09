@@ -159,7 +159,11 @@ export default function PracticeSetupPanel({
         spacing={1}
         alignItems="center"
         justifyContent="space-between"
-        sx={{ p: 1.25, gap: 1, flexWrap: "wrap" }}
+        sx={{
+          p: 1.25,
+          gap: 1,
+          flexWrap: "wrap",
+        }}
       >
         <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
           <Chip size="sm" variant="soft" color="primary">
@@ -203,15 +207,24 @@ export default function PracticeSetupPanel({
             {apiStatusLabel[apiKeyStatus]}
           </Chip>
         </Stack>
-        <Button
-          size="sm"
-          variant="plain"
-          color="neutral"
-          startDecorator={expanded ? <CollapseIcon /> : <TuneIcon />}
-          onClick={() => setExpanded((value) => !value)}
+        <Box
+          sx={{
+            width: { xs: "100%", sm: "auto" },
+            display: "flex",
+            justifyContent: { xs: "flex-end", sm: "flex-start" },
+            mt: { xs: 0.25, sm: 0 },
+          }}
         >
-          {expanded ? "Hide setup" : "Setup"}
-        </Button>
+          <Button
+            size="sm"
+            variant="plain"
+            color="neutral"
+            startDecorator={expanded ? <CollapseIcon /> : <TuneIcon />}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {expanded ? "Hide setup" : "Setup"}
+          </Button>
+        </Box>
       </Stack>
 
       {expanded && (

@@ -1,12 +1,11 @@
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
   Divider,
-  Dropdown,
   IconButton,
   ListItemDecorator,
   Menu,
-  MenuButton,
   MenuItem,
   Stack,
   Tooltip,
@@ -48,8 +47,55 @@ export default function SidebarNav({
   collapsed = false,
   onToggleCollapsed,
 }: SidebarNavProps) {
+  const [userMenuAnchor, setUserMenuAnchor] = useState<HTMLElement | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const handleSidebarControl = onToggleCollapsed ?? onNavigate;
+  const sidebarControlTitle = collapsed ? "Open sidebar" : onToggleCollapsed ? "Close sidebar" : "Close menu";
+  const isUserMenuOpen = Boolean(userMenuAnchor);
+
+  useEffect(() => {
+    setUserMenuAnchor(null);
+  }, [collapsed]);
+
+  const userMenuButton = (
+    <Box
+      component="button"
+      type="button"
+      aria-haspopup="menu"
+      aria-expanded={isUserMenuOpen ? "true" : undefined}
+      onClick={(event) => {
+        if (collapsed) return;
+        setUserMenuAnchor(event.currentTarget);
+      }}
+      sx={{
+        border: 0,
+        bgcolor: "transparent",
+        color: "neutral.700",
+        justifyContent: collapsed ? "center" : "flex-start",
+        borderRadius: "md",
+        px: collapsed ? 0 : 1,
+        py: 1,
+        width: collapsed ? 44 : "100%",
+        minWidth: collapsed ? 44 : undefined,
+        alignSelf: collapsed ? "center" : "stretch",
+        minHeight: 40,
+        display: "flex",
+        alignItems: "center",
+        gap: collapsed ? 0 : 0.75,
+        font: "inherit",
+        cursor: "pointer",
+        "&:hover": { bgcolor: "neutral.100" },
+      }}
+    >
+      <PersonIcon sx={{ fontSize: 18, color: "neutral.500" }} />
+      {!collapsed && (
+        <Typography level="body-sm" noWrap sx={{ fontWeight: 700 }}>
+          {username}
+        </Typography>
+      )}
+    </Box>
+  );
 
   return (
     <Box
@@ -105,8 +151,16 @@ export default function SidebarNav({
               </IconButton>
             </Tooltip>
           )}
-          <Tooltip title={collapsed ? "Open sidebar" : "Close sidebar"} placement={collapsed ? "right" : "bottom"}>
-            <IconButton size="sm" variant="plain" color="neutral" onClick={onToggleCollapsed}>
+          <Tooltip title={sidebarControlTitle} placement={collapsed ? "right" : "bottom"}>
+            <IconButton
+              size="sm"
+              variant="plain"
+              color="neutral"
+              onClick={() => {
+                setUserMenuAnchor(null);
+                handleSidebarControl?.();
+              }}
+            >
               {collapsed ? <ExpandIcon /> : <CollapseIcon />}
             </IconButton>
           </Tooltip>
@@ -215,48 +269,44 @@ export default function SidebarNav({
 
       <Box sx={{ flex: 1 }} />
 
-      <Dropdown>
-        <Tooltip title={collapsed ? username : ""} placement="right">
-          <MenuButton
-            variant="plain"
-            color="neutral"
-            sx={{
-              justifyContent: collapsed ? "center" : "flex-start",
-              borderRadius: "md",
-              px: collapsed ? 0 : 1,
-              py: 1,
-              width: collapsed ? 44 : "100%",
-              minWidth: collapsed ? 44 : undefined,
-              alignSelf: collapsed ? "center" : "stretch",
-              "--Button-gap": collapsed ? "0px" : undefined,
-              "--Button-decoratorChildHeight": collapsed ? "18px" : undefined,
-            }}
-            startDecorator={<PersonIcon sx={{ fontSize: 18 }} />}
-          >
-            {!collapsed && (
-              <Typography level="body-sm" noWrap sx={{ fontWeight: 700 }}>
-                {username}
-              </Typography>
-            )}
-          </MenuButton>
+      {collapsed ? (
+        <Tooltip title={username} placement="right">
+          {userMenuButton}
         </Tooltip>
+      ) : (
+        userMenuButton
+      )}
+      {!collapsed && (
         <Menu
+          open={isUserMenuOpen}
+          anchorEl={userMenuAnchor}
+          onClose={() => setUserMenuAnchor(null)}
+          disablePortal
           placement="top-start"
           size="sm"
           sx={{
             minWidth: 180,
             p: 0,
             overflow: "hidden",
+            zIndex: 1600,
           }}
         >
-          <MenuItem color="danger" onClick={onLogout} sx={{ minHeight: 40 }}>
+          <MenuItem
+            color="danger"
+            onClick={() => {
+              setUserMenuAnchor(null);
+              onNavigate?.();
+              onLogout();
+            }}
+            sx={{ minHeight: 40 }}
+          >
             <ListItemDecorator>
               <LogoutIcon fontSize="small" />
             </ListItemDecorator>
             Logout
           </MenuItem>
         </Menu>
-      </Dropdown>
+      )}
     </Box>
   );
 }

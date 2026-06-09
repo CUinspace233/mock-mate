@@ -75,7 +75,7 @@ export default function AppShell({
       </Box>
 
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} size="sm">
-        {drawerNav}
+        {drawerOpen ? drawerNav : null}
       </Drawer>
 
       <Box

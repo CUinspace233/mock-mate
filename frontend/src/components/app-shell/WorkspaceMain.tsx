@@ -2,11 +2,12 @@ import { Box } from "@mui/joy";
 
 interface WorkspaceMainProps {
   children: React.ReactNode;
-  variant?: "chat" | "wide";
+  variant?: "chat" | "wide" | "fluid";
 }
 
 export default function WorkspaceMain({ children, variant = "wide" }: WorkspaceMainProps) {
   const isChat = variant === "chat";
+  const isFluid = variant === "fluid";
 
   return (
     <Box
@@ -17,13 +18,13 @@ export default function WorkspaceMain({ children, variant = "wide" }: WorkspaceM
         overflow: isChat ? "hidden" : "auto",
         display: "flex",
         flexDirection: "column",
-        px: { xs: 1.5, sm: 2.5, lg: 4 },
+        px: isChat || isFluid ? { xs: 1.5, sm: 2, lg: 2.5 } : { xs: 1.5, sm: 2.5, lg: 4 },
         py: { xs: 1.5, sm: 2.5 },
       }}
     >
       <Box
         sx={{
-          maxWidth: isChat ? 980 : 1180,
+          maxWidth: isChat || isFluid ? "none" : 1180,
           mx: "auto",
           width: "100%",
           minHeight: isChat ? 0 : "100%",

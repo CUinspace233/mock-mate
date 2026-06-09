@@ -58,25 +58,25 @@ export default function SidebarNav({
         display: "flex",
         flexDirection: "column",
         gap: 1.5,
-        p: collapsed ? 1 : 1.5,
+        p: 1.5,
         bgcolor: "background.body",
         borderRight: { md: "1px solid var(--joy-palette-neutral-200)" },
       }}
     >
       <Stack
         direction="row"
-        alignItems="center"
+        alignItems="flex-start"
         justifyContent={collapsed ? "center" : "space-between"}
-        sx={{ px: collapsed ? 0 : 1 }}
+        sx={{ height: 76, overflow: "hidden", px: collapsed ? 0 : 1 }}
       >
         {!collapsed && (
           <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
-            <MockMateIcon size={34} />
+            <MockMateIcon size={36} />
             <Box sx={{ minWidth: 0 }}>
-              <Typography level="title-md" sx={{ fontWeight: 800, color: "neutral.900" }}>
+              <Typography level="title-md" noWrap sx={{ fontWeight: 800, color: "neutral.900" }}>
                 MockMate
               </Typography>
-              <Typography level="body-xs" sx={{ color: "neutral.500" }}>
+              <Typography level="body-xs" noWrap sx={{ color: "neutral.500" }}>
                 Interview coach
               </Typography>
             </Box>
@@ -105,7 +105,7 @@ export default function SidebarNav({
               </IconButton>
             </Tooltip>
           )}
-          <Tooltip title={collapsed ? "Expand sidebar" : "Collapse sidebar"} placement={collapsed ? "right" : "bottom"}>
+          <Tooltip title={collapsed ? "Open sidebar" : "Close sidebar"} placement={collapsed ? "right" : "bottom"}>
             <IconButton size="sm" variant="plain" color="neutral" onClick={onToggleCollapsed}>
               {collapsed ? <ExpandIcon /> : <CollapseIcon />}
             </IconButton>
@@ -216,24 +216,30 @@ export default function SidebarNav({
       <Box sx={{ flex: 1 }} />
 
       <Dropdown>
-        <MenuButton
-          variant="plain"
-          color="neutral"
-          sx={{
-            justifyContent: collapsed ? "center" : "flex-start",
-            borderRadius: "md",
-            px: 1,
-            py: 1,
-            width: "100%",
-          }}
-          startDecorator={<PersonIcon sx={{ fontSize: 18 }} />}
-        >
-          {!collapsed && (
-            <Typography level="body-sm" noWrap sx={{ fontWeight: 700 }}>
-              {username}
-            </Typography>
-          )}
-        </MenuButton>
+        <Tooltip title={collapsed ? username : ""} placement="right">
+          <MenuButton
+            variant="plain"
+            color="neutral"
+            sx={{
+              justifyContent: collapsed ? "center" : "flex-start",
+              borderRadius: "md",
+              px: collapsed ? 0 : 1,
+              py: 1,
+              width: collapsed ? 44 : "100%",
+              minWidth: collapsed ? 44 : undefined,
+              alignSelf: collapsed ? "center" : "stretch",
+              "--Button-gap": collapsed ? "0px" : undefined,
+              "--Button-decoratorChildHeight": collapsed ? "18px" : undefined,
+            }}
+            startDecorator={<PersonIcon sx={{ fontSize: 18 }} />}
+          >
+            {!collapsed && (
+              <Typography level="body-sm" noWrap sx={{ fontWeight: 700 }}>
+                {username}
+              </Typography>
+            )}
+          </MenuButton>
+        </Tooltip>
         <Menu
           placement="top-start"
           size="sm"

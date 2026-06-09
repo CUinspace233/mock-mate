@@ -432,7 +432,7 @@ export default function InterviewTraining({ username, onLogout }: InterviewTrain
       onLogout={onLogout}
     >
       {location.pathname === "/resume-drill" ? (
-        <WorkspaceMain variant="wide">
+        <WorkspaceMain variant="fluid">
           {setupPanel}
           <ResumeDrill
             isActive={isResumeDrillTab}

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Avatar,
   Box,
   Button,
   Card,
@@ -20,7 +19,6 @@ import {
   Delete as DeleteIcon,
   Description as DescriptionIcon,
   UploadFile as UploadFileIcon,
-  FactCheck as FactCheckIcon,
   Visibility as VisibilityIcon,
 } from "@mui/icons-material";
 import ConfirmActionModal from "../ConfirmActionModal";
@@ -122,11 +120,8 @@ export default function ResumeDrillSidebar({
               <ChevronRightIcon />
             </IconButton>
           </Tooltip>
-          <Avatar size="sm" sx={{ bgcolor: "primary.50", color: "primary.600" }}>
-            <FactCheckIcon fontSize="small" />
-          </Avatar>
           {resume && (
-            <Tooltip title="Preview parsed JSON" placement="right">
+            <Tooltip title="Preview resume" placement="right">
               <IconButton
                 size="sm"
                 color="neutral"
@@ -147,9 +142,6 @@ export default function ResumeDrillSidebar({
           alignItems="center"
           sx={{ display: { xs: "flex", md: isCollapsed ? "none" : "flex" } }}
         >
-          <Avatar size="sm" sx={{ bgcolor: "primary.50", color: "primary.600" }}>
-            <FactCheckIcon fontSize="small" />
-          </Avatar>
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography level="title-md">Resume Drill</Typography>
             <Typography level="body-xs" sx={{ color: "neutral.500" }}>
@@ -223,7 +215,7 @@ export default function ResumeDrillSidebar({
                   </Box>
                 </Stack>
                 <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
-                  <Tooltip title={isResumePreviewOpen ? "Hide parsed JSON" : "Preview parsed JSON"}>
+                  <Tooltip title={isResumePreviewOpen ? "Hide resume" : "Preview resume"}>
                     <IconButton
                       size="sm"
                       color="neutral"
